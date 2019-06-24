@@ -30,7 +30,7 @@ public class ProductA implements Product {
 
     @Override
     public void use() {
-        System.out.printf("I am product: {%s}!\n", name);
+        System.out.printf("I am product: [%s]!\n", name);
     }
 
     @Override
@@ -73,6 +73,6 @@ public class User {
 ```
 控制台输出：
 ```
-I am product: {p1}!
-I am product: {p2}!
+I am product: [p1]!
+I am product: [p2]!
 ```
