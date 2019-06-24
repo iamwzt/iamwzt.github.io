@@ -1,10 +1,10 @@
 # Site settings | 网站设置
 title: iamwzt
-SEOTitle: iamwzt的博客 | RaimbomSea
+SEOTitle: iamwzt的博客 | Iamwzt
 header-img: img/home-bg-he.png
-email: iamwzt@qq.com
+email: 981911861@qq.com
 description: "iamwzt的博客"
-keyword: "iamwzt, iamwzt的博客, rainbom sea, iamwzt, Python blog"
+keyword: "iamwzt, iamwzt的博客, Java blog"
 url: "http://iamwzt.github.io"          # your host, for absolute URL
 baseurl: ""      # for example, '/blog' if your blog hosted on 'host/blog'
 github_repo: "https://github.com/iamwzt/iamwzt.github.io.git" #code repository | 代码仓库
@@ -20,10 +20,10 @@ sidebar-avatar: /img/head.jpg      # 头像
 
 
 # SNS settings | 社交网络设置
-facebook_username: rainbom.z
+facebook_username: 
 github_username: iamwzt
-zhihu_username: iamwzt
-csdn_username: qq_39268193
+zhihu_username: 
+csdn_username: 
 
 
 
