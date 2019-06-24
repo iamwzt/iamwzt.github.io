@@ -5,7 +5,7 @@
 1. 一个工厂类
 2. 一个工厂类的静态生产方法
 	1. 条件判断（根据不同条件`new`相应的对象，如名称），违背了开闭原则，有新的产品需要修改代码
-	2. 改进，根据反射的方式来`new`对象
+	2. 改进，根绝反射的方式`new`对象
 3. 一个产品接口
 4. 多个产品类
 
@@ -50,6 +50,121 @@ public class SimpleFactory {
     // 根据反射来生产
     public static Shape createOneShape(Class<? extends Shape> clz) throws Exception {
         return clz.newInstance();
+    }
+}
+```
+---
+
+## 工厂方法
+
+> 又称多态性工厂（Polymorphic Factory）模式或虚拟构造子（Virtual Constructor）模式；
+
+### 特点
+> 在简单工厂的基础上对工厂进行了抽象
+
+### 组成
+1. 一个抽象工厂类
+2. 多个具体工厂类
+3. 一个抽象产品类
+4. 多个具体产品类
+
+### 代码示例
+#### 抽象工厂
+```java
+public interface IFactory {
+     Shape createOneShape();
+ }
+```
+#### 多个具体工厂
+```java
+public class CircleFactory implements IFactory {
+    @Override
+    public Shape createOneShape() {
+        return new Circle();
+    }
+}
+```
+```java
+public class TriangleFactory implements IFactory {
+    @Override
+    public Shape createOneShape() {
+        return new Triangle();
+    }
+}
+```
+#### 抽象产品及产品类如简单工厂
+
+---
+
+## 抽象工厂模式
+> 又称工具箱（Kit 或Toolkit）模式
+
+### 特点
+> 在工厂模式基础上，每个工厂可以生产多个相关的产品；使用于一个系统需要一组对象共同完成任务，且比较稳定，不会频繁变化
+
+### 组成
+1. 一个抽象工厂类，有生产不同产品的接口
+2. 多个具体工厂类
+3. `N`个抽象产品类
+4. `M×N`个具体产品类
+
+### 代码示例
+> 在上面示例的基础上，增加了一个产品`Color`
+#### 抽象工厂类
+```java
+public interface AbstractFactory {
+    Shape createOneShape();
+    Color createOneColor();
+}
+```
+#### 具体工厂类
+```java
+public class GreenTriangleFactory implements AbstractFactory {
+    @Override
+    public Shape createOneShape() {
+        return new Triangle();
+    }
+
+    @Override
+    public Color createOneColor() {
+        return new Green();
+    }
+}
+```
+```java
+public class RedCircleFactory implements AbstractFactory {
+    @Override
+    public Shape createOneShape() {
+        return new Circle();
+    }
+
+    @Override
+    public Color createOneColor() {
+        return new Red();
+    }
+}
+```
+#### 抽象产品类
+> `Shape`见上面的代码，此处只有`Color`
+```java
+public abstract class Color {
+    public abstract void print();
+}
+```
+#### 具体产品类
+```java
+public class Red extends Color {
+    @Override
+    public void print() {
+        System.out.println("The Circle is red.");
+    }
+}
+```
+```java
+public class Green extends Color {
+    @Override
+    public void print() {
+        System.out.println("The Triangle id green.");
     }
 }
 ```
