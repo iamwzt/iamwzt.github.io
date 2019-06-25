@@ -20,7 +20,8 @@ tags:
 ### 组成
 1. 原型接口（继承`Cloneable`接口，该接口是个标记接口，没有任何方法）
 2. 实现原型接口的类
-3. 管理原型的类
+3. 管理原型对象及clone的类
+4. 使用原型的类
 
 ### 代码示例
 #### 原型接口
@@ -56,10 +57,16 @@ public class ProductA implements Product {
 #### 管理原型类clone的类
 ```java
 public class Manager {
+    /**
+    * 缓存，用hashmap来保存原型对象
+    */
     private static Map<String, Product> dict = new HashMap<>();
     public static void register(String name, Product product){
         dict.put(name, product);
     }
+    /**
+    * 从缓存中取出原型对象，并clone出新对象
+    */
     public static Product getClone(String name) throws CloneNotSupportedException {
         Product product = dict.get(name);
         if (product != null) {
