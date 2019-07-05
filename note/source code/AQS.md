@@ -47,4 +47,21 @@ Subclasses that support only exclusive or only shared modes need not define the 
 
 `AQS`默认支持`独占`或`共享`中的任一或两种模式。当通过独占模式获取锁时，其它线程就无法成功获取。
 多个线程获取共享模式的锁可能（但不一定）成功。
+除了在机械意义上，当一个线程以共享模式获取成功，下一个等待的线程必须得确认是否能够获取之外，`AQS`不理解这个区别。
+不同模式下等待的线程共享同一个FIFO队列。
+通常来说子类只需支持其中一种模式，但也有例外（如`ReadWriteLock`）。
+只支持一种模式的子类无需实现未支持模式的相关方法。
+
+> This class defines a nested `ConditionObject` class that
+can be used as a `Condition` implementation by subclasses
+supporting exclusive mode for which method `isHeldExclusively` 
+reports whether synchronization is exclusively held with respect to the current thread, 
+method `release` invoked with the current `getState` value fully releases this object, 
+and `acquire`, given this saved state value, 
+eventually restores this object to its previous acquired state.  
+No `AbstractQueuedSynchronizer` method otherwise creates such a
+condition, so if this constraint cannot be met, do not use it.  
+The behavior of `ConditionObject` depends of course on the semantics of its synchronizer implementation.
+
+
 
