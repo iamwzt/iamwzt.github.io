@@ -1,6 +1,20 @@
+---
+layout:     post
+title:      AQS源码分析——从RenentrantLock初窥AQS（1）
+subtitle:   公平锁和非公平锁获取释放锁浅析
+date:       2019-07-07
+author:     iamwzt
+header-img: img/post-web.jpg
+catalog: true
+tags:
+    - AQS
+    - ReentrantLock
+---
+
 `ReentrantLock`实现了`Lock`，有一个继承了`AQS`的内部抽象类`Sync`，并有两个内部实现类，分别是公平锁实现`FairSync`和非公平锁实现`NonfairSync`。
 
 采用了模板设计模式。
+--more--
 
 #### `ReentrantLock`的`lock()`方法
 ```java
