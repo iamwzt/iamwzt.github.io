@@ -12,35 +12,38 @@ tags:
 ---
 
 ## 一 `AQS` 简介
+AbstractQueuedSynchronizer，抽象队列同步器，为JUC包中的各阻塞锁和同步器
+提供了一个框架，其基于一个FIFO队列（CLH队列的一种变体），以模板设计模式，为大
+多数同步器提供了一个基本的实现。
 ### 1.1 两个内部类
 #### 1.1.1 `Node`：队列节点类
 `Node`类是`AQS`的FIFO等待队列的节点类，其主要有以下字段属性：
 ```java
-    /** 共享模式下等待的节点标记 */
+    // 共享模式下等待的节点标记
     static final Node SHARED = new Node();
-    /** 独占模式下等待的节点标记 */
+    // 独占模式下等待的节点标记
     static final Node EXCLUSIVE = null;
     
-    /** 等待状态值：当前节点的线程已取消等待（可能是因为超时、中断等原因，一旦标记则不再变化） */
+    // 等待状态值：当前节点的线程已取消等待（可能是因为超时、中断等原因，一旦标记则不再变化）
     static final int CANCELLED =  1;
-    /** 等待状态值：当前节点的后继节点需要唤醒（也可以理解成后继节点的状态，在当前节点取消或释放锁时进行唤醒操作） */
+    // 等待状态值：当前节点的后继节点需要唤醒（也可以理解成后继节点的状态，在当前节点取消或释放锁时进行唤醒操作）
     static final int SIGNAL    = -1;
-    /** 等待状态值：当前节点在条件队列中排队等待（被移入等待队列后会设置成0） */
+    // 等待状态值：当前节点在条件队列中排队等待（被移入等待队列后会设置成0）
     static final int CONDITION = -2;
-    /** 等待状态值：下一个共享锁的获取操作将无条件扩散（没有理解） */
+    // 等待状态值：下一个共享锁的获取操作将无条件扩散（没有理解）
     static final int PROPAGATE = -3;
-    /** 等待状态，取值为上4种，以及默认值0*/
+    // 等待状态，取值为上4种，以及默认值0/
     volatile int waitStatus;
 
-    /** 前驱节点 */
+    // 前驱节点
     volatile Node prev;
-    /** 后置节点 */
+    // 后置节点
     volatile Node next;
 
-    /** 将当前节点入队的线程，即当前线程 */
+    // 将当前节点入队的线程，即当前线程
     volatile Thread thread;
 
-    /** 在条件队列中使用 */
+    // 在条件队列中使用
     Node nextWaiter;
 ```
 #### 1.1.2 `ConditionObject`：条件类
@@ -50,11 +53,11 @@ tags:
 
 主要属性有四个：
 ```java
-    /** 等待队列头结点. */
+    // 等待队列头结点
     private transient Node firstWaiter;
-    /** 等待队列尾节点. */
+    // 等待队列尾节点
     private transient Node lastWaiter;
-    /** 从等待中唤醒后对中断的两个处理策略（重新中断和抛出异常） */
+    // 从等待中唤醒后对中断的两个处理策略（重新中断和抛出异常）
     private static final int REINTERRUPT =  1;
     private static final int THROW_IE    = -1;
 ```
@@ -62,19 +65,15 @@ tags:
 
 ### 1.2 `AQS`自身的几个属性
 ```java
-    /** 
-    * 等待队列的头结点，其实并不在队列中。可以理解成当前占有锁的线程所在的节点（并不一定，
-    * 看后面进一步说明）等待队列实际上是CLH队列锁的一种变种实现，有个特点就是需要一个虚
-    * 头节点作为开始，但不需要在一开始就创建，因为如果从不产生竞争的话就会造成浪费。只有
-    * 在第一次竞争发生时，才去创建。（看不懂的看下面代码分析）
-    */
+    // 等待队列的头结点，其实并不在队列中。可以理解成当前占有锁的线程所在的节点（并不一定，
+    // 看后面进一步说明）等待队列实际上是CLH队列锁的一种变种实现，有个特点就是需要一个虚
+    // 头节点作为开始，但不需要在一开始就创建，因为如果从不产生竞争的话就会造成浪费。只有
+    // 在第一次竞争发生时，才去创建。（看不懂的看下面代码分析）
     private transient volatile Node head;
-    /** 等待队列的尾节点 */
+    // 等待队列的尾节点
     private transient volatile Node tail;
-    /** 
-    * 同步状态，获取/释放锁都要更新这个状态，在不同的实现里有不同含义
-    * 如在ReentrantLock中代表重入的次数
-    */
+    // 同步状态，获取/释放锁都要更新这个状态，在不同的实现里有不同含义
+    // 如在ReentrantLock中代表重入的次数
     private volatile int state;
 ```
 ### 1.3 `AQS`子类的实现方式
@@ -83,21 +82,21 @@ tags:
 
 子类需要实现的几个方法：
 ```java
-    protected boolean tryAcquire(int arg) {
-        throw new UnsupportedOperationException();
-    }
-    protected boolean tryRelease(int arg) {
-        throw new UnsupportedOperationException();
-    }
-    protected int tryAcquireShared(int arg) {
-        throw new UnsupportedOperationException();
-    }
-    protected boolean tryReleaseShared(int arg) {
-        throw new UnsupportedOperationException();
-    }
-    protected boolean isHeldExclusively() {
-        throw new UnsupportedOperationException();
-    }    
+protected boolean tryAcquire(int arg) {
+    throw new UnsupportedOperationException();
+}
+protected boolean tryRelease(int arg) {
+    throw new UnsupportedOperationException();
+}
+protected int tryAcquireShared(int arg) {
+    throw new UnsupportedOperationException();
+}
+protected boolean tryReleaseShared(int arg) {
+    throw new UnsupportedOperationException();
+}
+protected boolean isHeldExclusively() {
+    throw new UnsupportedOperationException();
+}    
 ```
 可以看出，这几个方法分为了共享和独占两种情况，默认会抛出不支持操作异常。
 
@@ -141,6 +140,7 @@ public final void acquire(int arg) {
         selfInterrupt();
 }
 ```
+#### 2.1.4 `ReentrantLock`的`tryAcquire()`方法
 `tryAcquire()`方法需要实现类自己去实现，在公平锁中，是这样的：
 ```java
 protected final boolean tryAcquire(int acquires) {
@@ -182,7 +182,7 @@ public final boolean hasQueuedPredecessors() {
         ((s = h.next) == null || s.thread != Thread.currentThread());
 }
 ```
-再来看看非公平锁的实现：这里*和公平锁有第二个不同*，锁可用时不管队列里有没有排队的，先抢一波试试
+再来看看非公平锁的实现：这里**和公平锁有第二个不同**，锁可用时不管队列里有没有排队的，先抢一波试试
 ```java
 final boolean nonfairTryAcquire(int acquires) {
     final Thread current = Thread.currentThread();
@@ -204,9 +204,8 @@ final boolean nonfairTryAcquire(int acquires) {
     return false;
 }
 ```
-
+#### 2.1.5 `AQS`的`addWaiter()`方法
 这里回到`AQS`的`acquire`方法，`tryAcquire`失败后，就要乖乖排队了。<br/>
-`AQS`的`addWaiter`方法：
 ```java
 private Node addWaiter(Node mode) {
     Node node = new Node(Thread.currentThread(), mode);
@@ -248,6 +247,7 @@ private Node enq(final Node node) {
 }
 ```
 
+#### 2.1.6 `AQS`的`acquireQueued()`方法
 正常情况下，到这里就已经成功入队了，然后回到`AQS`的`acquire`方法：
 ```java
 public final void acquire(int arg) {
@@ -310,4 +310,98 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
 }
 ```
 简单以一个流程图总结一下：<br>
-<div align=center>![这里有图](https://github.com/iamwzt/iamwzt.github.io/blob/master/img/AQS/AQS-acquire.png?raw=true)</div>
+![这里有图](https://github.com/iamwzt/iamwzt.github.io/blob/master/img/AQS/AQS-acquire.png?raw=true)
+
+### 2.2 释放锁
+#### 2.2.1 `ReentrantLock`的`unlock()`方法
+```java
+public void unlock() {
+    sync.release(1);
+}
+```
+#### 2.2.2 `AQS`的`release()`方法
+```java
+public final boolean release(int arg) {
+    if (tryRelease(arg)) {
+        Node h = head;
+        if (h != null && h.waitStatus != 0)
+            unparkSuccessor(h);
+        return true;
+    }
+    return false;
+}
+```
+#### 2.2.3 `ReentrantLock`的`tryRelease`方法
+```java
+protected final boolean tryRelease(int releases) {
+    int c = getState() - releases;
+    // 若非当前持有锁的线程，就抛出异常
+    if (Thread.currentThread() != getExclusiveOwnerThread())
+        throw new IllegalMonitorStateException();
+    boolean free = false;
+    // c 等于 0，则代表重入次数都清空了，可以释放锁了
+    if (c == 0) {
+        free = true;
+        setExclusiveOwnerThread(null);
+    }
+    setState(c);
+    return free;
+}
+```
+#### 2.2.4 `AQS`的`unparkSuccessor`方法
+```java
+private void unparkSuccessor(Node node) {
+    // 成不成功无所谓，反正锁也用完了，在下面都要唤醒后继节点了
+    int ws = node.waitStatus;
+    if (ws < 0)
+        compareAndSetWaitStatus(node, ws, 0);
+    // 唤醒后继节点，一般就是后面的一个，但若已取消或为null，
+    // 就从尾节点开始向前找到最前面的一个没有取消且不为null
+    // 的节点
+    Node s = node.next;
+    if (s == null || s.waitStatus > 0) {
+        s = null;
+        for (Node t = tail; t != null && t != node; t = t.prev)
+            if (t.waitStatus <= 0)
+                s = t;
+    }
+    if (s != null)
+        LockSupport.unpark(s.thread);
+}
+```
+最后来看一下唤醒后的线程怎么运行吧。
+```java
+final boolean acquireQueued(final Node node, int arg) {
+    boolean failed = true;
+    try {
+        boolean interrupted = false;
+        for (;;) {
+            final Node p = node.predecessor();
+            // 若前置节点是head，可以去尝试获取锁
+            if (p == head && tryAcquire(arg)) {
+                setHead(node);
+                p.next = null; // help GC
+                failed = false;
+                return interrupted;
+            }
+            // 要么前置节点不是head，要么获取失败
+            if (shouldParkAfterFailedAcquire(p, node) &&
+                // 挂起线程
+                parkAndCheckInterrupt())
+                interrupted = true;
+            // 如果没有发生过中断，那就不会进条件
+            // 在下一个循环中就会去获取锁了
+        }
+    } finally {
+        if (failed)
+            cancelAcquire(node);
+    }
+}
+```
+
+--未完待续--
+
+参考文章：
+1. [一行一行源码分析清楚AbstractQueuedSynchronizer](https://javadoop.com/post/AbstractQueuedSynchronizer)
+
+
