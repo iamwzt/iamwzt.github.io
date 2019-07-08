@@ -11,18 +11,111 @@ tags:
     - ReentrantLock
 ---
 
-`ReentrantLock`实现了`Lock`，有一个继承了`AQS`的内部抽象类`Sync`，并有两个内部实现类，分别是公平锁实现`FairSync`和非公平锁实现`NonfairSync`。
+## 一 `AQS` 简介
+### 1.1 两个内部类
+#### 1.1.1 `Node`：队列节点类
+`Node`类是`AQS`的FIFO等待队列的节点类，其主要有以下字段属性：
+```java
+    /** 共享模式下等待的节点标记 */
+    static final Node SHARED = new Node();
+    /** 独占模式下等待的节点标记 */
+    static final Node EXCLUSIVE = null;
+    
+    /** 等待状态值：当前节点的线程已取消等待（可能是因为超时、中断等原因，一旦标记则不再变化） */
+    static final int CANCELLED =  1;
+    /** 等待状态值：当前节点的后继节点需要唤醒（也可以理解成后继节点的状态，在当前节点取消或释放锁时进行唤醒操作） */
+    static final int SIGNAL    = -1;
+    /** 等待状态值：当前节点在条件队列中排队等待（被移入等待队列后会设置成0） */
+    static final int CONDITION = -2;
+    /** 等待状态值：下一个共享锁的获取操作将无条件扩散（没有理解） */
+    static final int PROPAGATE = -3;
+    /** 等待状态，取值为上4种，以及默认值0*/
+    volatile int waitStatus;
 
-采用了模板设计模式。
---more--
+    /** 前驱节点 */
+    volatile Node prev;
+    /** 后置节点 */
+    volatile Node next;
 
-#### `ReentrantLock`的`lock()`方法
+    /** 将当前节点入队的线程，即当前线程 */
+    volatile Thread thread;
+
+    /** 在条件队列中使用 */
+    Node nextWaiter;
+```
+#### 1.1.2 `ConditionObject`：条件类
+`ConditionObject`实现了`Condition`接口，用于实现`Object`的`wait/notify/notifyAll`方法。
+
+相比`Object`，`Condition`更加灵活，最大的优势就是一个锁对象可以有多个条件队列，实现精准唤醒。
+
+主要属性有四个：
+```java
+    /** 等待队列头结点. */
+    private transient Node firstWaiter;
+    /** 等待队列尾节点. */
+    private transient Node lastWaiter;
+    /** 从等待中唤醒后对中断的两个处理策略（重新中断和抛出异常） */
+    private static final int REINTERRUPT =  1;
+    private static final int THROW_IE    = -1;
+```
+关于`Condition`的代码分析将在下一篇中进行。
+
+### 1.2 `AQS`自身的几个属性
+```java
+    /** 
+    * 等待队列的头结点，其实并不在队列中。可以理解成当前占有锁的线程所在的节点（并不一定，
+    * 看后面进一步说明）等待队列实际上是CLH队列锁的一种变种实现，有个特点就是需要一个虚
+    * 头节点作为开始，但不需要在一开始就创建，因为如果从不产生竞争的话就会造成浪费。只有
+    * 在第一次竞争发生时，才去创建。（看不懂的看下面代码分析）
+    */
+    private transient volatile Node head;
+    /** 等待队列的尾节点 */
+    private transient volatile Node tail;
+    /** 
+    * 同步状态，获取/释放锁都要更新这个状态，在不同的实现里有不同含义
+    * 如在ReentrantLock中代表重入的次数
+    */
+    private volatile int state;
+```
+### 1.3 `AQS`子类的实现方式
+`AQS`的子类一般被实现为内部辅助类，如`ReentrantLock`中的`Sync`抽象类
+（有公平锁`FairSync`和非公平锁`NonfairSync`两种内部实现类）。
+
+子类需要实现的几个方法：
+```java
+    protected boolean tryAcquire(int arg) {
+        throw new UnsupportedOperationException();
+    }
+    protected boolean tryRelease(int arg) {
+        throw new UnsupportedOperationException();
+    }
+    protected int tryAcquireShared(int arg) {
+        throw new UnsupportedOperationException();
+    }
+    protected boolean tryReleaseShared(int arg) {
+        throw new UnsupportedOperationException();
+    }
+    protected boolean isHeldExclusively() {
+        throw new UnsupportedOperationException();
+    }    
+```
+可以看出，这几个方法分为了共享和独占两种情况，默认会抛出不支持操作异常。
+
+子类可根据要实现的锁的类型，选择部分（如`ReentrantLock`）或全部（`ReentrantReadWriteLock`）进行实现。
+
+显然，`AQS`的实现采用了**模板设计模式**。
+
+下文将从`ReentrantLock`为入口，来一窥`AQS`的精要~
+
+## 二 代码分析
+### 2.1 获取锁
+#### 2.1.1 `ReentrantLock`的`lock()`方法
 ```java
 public void lock() {
     sync.lock();
 }
 ```
-#### `Sync`的`lock()`方法
+#### 2.1.2 `Sync`的`lock()`方法
 在这里 **公平锁和非公平锁出现了第一个不同**：非公平锁会立刻去抢一次锁，失败了才走正常流程
 ```java
 // FairSync实现的 
@@ -40,7 +133,7 @@ final void lock() {
 }
 ```
 
-#### `AQS`的`acquire()`方法
+#### 2.1.3 `AQS`的`acquire()`方法
 ```java
 public final void acquire(int arg) {
     if (!tryAcquire(arg) &&
@@ -57,6 +150,7 @@ protected final boolean tryAcquire(int acquires) {
         // 当前锁是可以用的，但是得先看看队列中是否已有其他等待者的waiter了
         if (!hasQueuedPredecessors() &&
             // 试着CAS抢一下锁，抢不到说明被其他线程抢先了（不是队列里的，队列里没有线程）
+            // 注意这里抢到了就只是设置了一下state，并没有进行head初始化
             compareAndSetState(0, acquires)) {
             // 抢到了就标记当前锁的占有者是本线程
             setExclusiveOwnerThread(current);
@@ -216,4 +310,4 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
 }
 ```
 简单以一个流程图总结一下：<br>
-![这里有图](https://github.com/iamwzt/iamwzt.github.io/blob/master/img/AQS/AQS-acquire.png?raw=true)
+<div align=center>![这里有图](https://github.com/iamwzt/iamwzt.github.io/blob/master/img/AQS/AQS-acquire.png?raw=true)</div>
