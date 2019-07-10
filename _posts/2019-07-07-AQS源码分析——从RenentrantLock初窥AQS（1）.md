@@ -11,12 +11,12 @@ tags:
     - ReentrantLock
 ---
 
-## 一 `AQS` 简介
+## `AQS` 简介
 AbstractQueuedSynchronizer，抽象队列同步器，为JUC包中的各阻塞锁和同步器
 提供了一个框架，其基于一个FIFO队列（CLH队列的一种变体），以模板设计模式，为大
 多数同步器提供了一个基本的实现。
-### 1.1 两个内部类
-#### 1.1.1 `Node`：队列节点类
+### 两个内部类
+#### `Node`：队列节点类
 `Node`类是`AQS`的FIFO等待队列的节点类，其主要有以下字段属性：
 ```java
     // 共享模式下等待的节点标记
@@ -46,7 +46,7 @@ AbstractQueuedSynchronizer，抽象队列同步器，为JUC包中的各阻塞锁
     // 在条件队列中使用
     Node nextWaiter;
 ```
-#### 1.1.2 `ConditionObject`：条件类
+#### `ConditionObject`：条件类
 `ConditionObject`实现了`Condition`接口，用于实现`Object`的`wait/notify/notifyAll`方法。
 
 相比`Object`，`Condition`更加灵活，最大的优势就是一个锁对象可以有多个条件队列，实现精准唤醒。
@@ -63,7 +63,7 @@ AbstractQueuedSynchronizer，抽象队列同步器，为JUC包中的各阻塞锁
 ```
 关于`Condition`的代码分析将在下一篇中进行。
 
-### 1.2 `AQS`自身的几个属性
+### `AQS`自身的几个属性
 ```java
     // 等待队列的头结点，其实并不在队列中。可以理解成当前占有锁的线程所在的节点（并不一定，
     // 看后面进一步说明）等待队列实际上是CLH队列锁的一种变种实现，有个特点就是需要一个虚
@@ -76,7 +76,7 @@ AbstractQueuedSynchronizer，抽象队列同步器，为JUC包中的各阻塞锁
     // 如在ReentrantLock中代表重入的次数
     private volatile int state;
 ```
-### 1.3 `AQS`子类的实现方式
+### `AQS`子类的实现方式
 `AQS`的子类一般被实现为内部辅助类，如`ReentrantLock`中的`Sync`抽象类
 （有公平锁`FairSync`和非公平锁`NonfairSync`两种内部实现类）。
 
@@ -106,15 +106,15 @@ protected boolean isHeldExclusively() {
 
 下文将从`ReentrantLock`为入口，来一窥`AQS`的精要~
 
-## 二 代码分析
-### 2.1 获取锁
-#### 2.1.1 `ReentrantLock`的`lock()`方法
+## 代码分析
+### 获取锁
+#### `ReentrantLock`的`lock()`方法
 ```java
 public void lock() {
     sync.lock();
 }
 ```
-#### 2.1.2 `Sync`的`lock()`方法
+#### `Sync`的`lock()`方法
 在这里 **公平锁和非公平锁出现了第一个不同**：非公平锁会立刻去抢一次锁，失败了才走正常流程
 ```java
 // FairSync实现的 
@@ -132,7 +132,7 @@ final void lock() {
 }
 ```
 
-#### 2.1.3 `AQS`的`acquire()`方法
+#### `AQS`的`acquire()`方法
 ```java
 public final void acquire(int arg) {
     if (!tryAcquire(arg) &&
@@ -140,7 +140,7 @@ public final void acquire(int arg) {
         selfInterrupt();
 }
 ```
-#### 2.1.4 `ReentrantLock`的`tryAcquire()`方法
+#### `ReentrantLock`的`tryAcquire()`方法
 `tryAcquire()`方法需要实现类自己去实现，在公平锁中，是这样的：
 ```java
 protected final boolean tryAcquire(int acquires) {
@@ -204,7 +204,7 @@ final boolean nonfairTryAcquire(int acquires) {
     return false;
 }
 ```
-#### 2.1.5 `AQS`的`addWaiter()`方法
+#### `AQS`的`addWaiter()`方法
 这里回到`AQS`的`acquire`方法，`tryAcquire`失败后，就要乖乖排队了。<br/>
 ```java
 private Node addWaiter(Node mode) {
@@ -247,7 +247,7 @@ private Node enq(final Node node) {
 }
 ```
 
-#### 2.1.6 `AQS`的`acquireQueued()`方法
+#### `AQS`的`acquireQueued()`方法
 正常情况下，到这里就已经成功入队了，然后回到`AQS`的`acquire`方法：
 ```java
 public final void acquire(int arg) {
@@ -312,14 +312,14 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
 简单以一个流程图总结一下：<br>
 ![这里有图](https://github.com/iamwzt/iamwzt.github.io/blob/master/img/AQS/AQS-acquire.png?raw=true)
 
-### 2.2 释放锁
-#### 2.2.1 `ReentrantLock`的`unlock()`方法
+### 释放锁
+#### `ReentrantLock`的`unlock()`方法
 ```java
 public void unlock() {
     sync.release(1);
 }
 ```
-#### 2.2.2 `AQS`的`release()`方法
+#### `AQS`的`release()`方法
 ```java
 public final boolean release(int arg) {
     if (tryRelease(arg)) {
@@ -331,7 +331,7 @@ public final boolean release(int arg) {
     return false;
 }
 ```
-#### 2.2.3 `ReentrantLock`的`tryRelease`方法
+#### `ReentrantLock`的`tryRelease`方法
 ```java
 protected final boolean tryRelease(int releases) {
     int c = getState() - releases;
@@ -348,7 +348,7 @@ protected final boolean tryRelease(int releases) {
     return free;
 }
 ```
-#### 2.2.4 `AQS`的`unparkSuccessor`方法
+#### `AQS`的`unparkSuccessor`方法
 ```java
 private void unparkSuccessor(Node node) {
     // 成不成功无所谓，反正锁也用完了，在下面都要唤醒后继节点了
