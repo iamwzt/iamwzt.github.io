@@ -10,7 +10,7 @@ tags:
     - AQS
     - Condition
 ---
-## 一 `Condition` 简介
+## `Condition` 简介
 `Condition`的`await()`/`signal()`/`signalAll()`方法提供了`Object`的`wait()`/`notify()`/`notifyAll()`方法的替代品；
 此外，还对其进行了增强：一个锁可以有多个`Condition`队列，以实现精准的唤醒。
 本文主要通过源码来看看`Condition`在`AQS`里是怎么实现的。
@@ -26,9 +26,9 @@ private transient Node lastWaiter;
 private static final int REINTERRUPT =  1;
 private static final int THROW_IE    = -1;
 ```
-## 二 代码分析
+## 代码分析
 
-### 2.1 等待方法 `await`
+### 等待方法 `await`
 等待方法有四个版本，分别是：
 1. await()：无超时机制，可中断
 2. awaitNanos(long)：有超时机制，可中断
@@ -37,7 +37,7 @@ private static final int THROW_IE    = -1;
 5. awaitUninterruptibly()：无超时机制，不可中断
 
 下文以第1个无超时机制、可中断的等待方法为例来看一下代码，其他的方法后面再谈。
-#### 2.1.1 `await()`
+#### `await()`
 ```java
 public final void await() throws InterruptedException {
     // 进方法先看看线程是否被中断了
@@ -70,7 +70,7 @@ public final void await() throws InterruptedException {
         reportInterruptAfterWait(interruptMode);
 }
 ```
-#### 2.1.2 `addConditionWaiter()`
+#### `addConditionWaiter()`
 将当前线程包装进node，并移入条件队列
 ```java
 private Node addConditionWaiter() {
@@ -94,7 +94,7 @@ private Node addConditionWaiter() {
 }
 ```
 
-#### 2.1.3 `unlinkCancelledWaiters()`
+#### `unlinkCancelledWaiters()`
 清除条件队列中取消的节点，纯链表操作
 ```java
 private void unlinkCancelledWaiters() {
@@ -120,7 +120,7 @@ private void unlinkCancelledWaiters() {
     }
 ```
 
-#### 2.1.4 `fullyRelease()`
+#### `fullyRelease()`
 完全释放锁，并返回当前state值。
 ```java
 final int fullyRelease(Node node) {
@@ -142,7 +142,7 @@ final int fullyRelease(Node node) {
 }
 ```
 
-#### 2.1.5 `isOnSyncQueue()`
+#### `isOnSyncQueue()`
 判断是否已在等待队列中
 ```java
 final boolean isOnSyncQueue(Node node) {
@@ -175,7 +175,7 @@ private boolean findNodeFromTail(Node node) {
     }
 }
 ```
-#### 2.1.7 中断检查及处理
+#### 中断检查及处理
 被唤醒后先进行中断检查，如果没有中断且还没被移入等待队列（意外唤醒），就将继续挂起；
 否则就退出循环，根据中断类型进行处理了。
 ```java
