@@ -161,7 +161,7 @@ final boolean isOnSyncQueue(Node node) {
 }
 ```
 
-#### 2.1.6 `findNodeFromTail()`
+#### `findNodeFromTail()`
 从尾部遍历等待队列，判断是否在队列中
 ```java
 private boolean findNodeFromTail(Node node) {
