@@ -269,6 +269,6 @@ final boolean transferForSignal(Node node) {
 ```
 这个时候唤醒节点做什么？
 
-在[AQS源码分析——从ReentrantLock初窥AQS(1)]()中的 `2.1.6 AQS的acquireQueued()方法`里其实提到过，
+在[AQS源码分析(1)——从ReentrantLock初窥AQS](https://iamwzt.github.io/2019/07/07/AQS%E6%BA%90%E7%A0%81%E5%88%86%E6%9E%90-%E4%BB%8ERenentrantLock%E5%88%9D%E7%AA%A5AQS-1/)中的 `2.1.6 AQS的acquireQueued()方法`里其实提到过，
 在排队中被唤醒，会尝试去获取锁，如果获取失败，就会去挂起，在挂起之前会将前驱节点的等待状态设置为SIGNAL的。
 
