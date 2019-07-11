@@ -219,5 +219,56 @@ private void reportInterruptAfterWait(int interruptMode)
         selfInterrupt();
 }
 ```
+### 通知方法 `signal`
+通知方法有通知1个和全部通知中两种：
+1. signal()
+2. signalAll()
+两者的区别就在于将条件队列队头节点移到等待队列，或者是将所有节点都移到等待队列。
+下文以signal()为例，分析一下代码：
 
+#### `signal()`
+```java
+public final void signal() {
+    // 如果没有持有锁就抛出异常
+    if (!isHeldExclusively())
+        throw new IllegalMonitorStateException();
+    Node first = firstWaiter;
+    if (first != null)
+        doSignal(first);
+}
+
+// 若转移队列失败（节点已取消）
+// 就从前往后在条件队列里找合适的节点唤醒
+private void doSignal(Node first) {
+    do {
+        if ( (firstWaiter = first.nextWaiter) == null)
+            lastWaiter = null;
+        first.nextWaiter = null;
+    } while (!transferForSignal(first) &&
+             (first = firstWaiter) != null);
+}
+```
+
+#### `transferForSignal()`
+```java
+final boolean transferForSignal(Node node) {
+    // 若CAS设置失败，则说明已取消
+    if (!compareAndSetWaitStatus(node, Node.CONDITION, 0))
+        return false;
+
+    // 入等待队列，返回的是前驱节点
+    Node p = enq(node);
+    
+    // 设置前驱节点的等待状态为SIGNAL
+    // 若前驱节点已取消，或设置失败，就唤醒当前节点
+    int ws = p.waitStatus;
+    if (ws > 0 || !compareAndSetWaitStatus(p, ws, Node.SIGNAL))
+        LockSupport.unpark(node.thread);
+    return true;
+}
+```
+这个时候唤醒节点做什么？
+
+在[AQS源码分析——从ReentrantLock初窥AQS(1)]()中的 `2.1.6 AQS的acquireQueued()方法`里其实提到过，
+在排队中被唤醒，会尝试去获取锁，如果获取失败，就会去挂起，在挂起之前会将前驱节点的等待状态设置为SIGNAL的。
 
