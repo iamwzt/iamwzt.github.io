@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      AQS源码分析——Condition（2）
+title:      AQS源码分析（2）——Condition条件队列
 subtitle:   条件队列简析
 date:       2019-07-09
 author:     iamwzt
