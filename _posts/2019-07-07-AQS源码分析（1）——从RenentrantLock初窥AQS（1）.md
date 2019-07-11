@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      AQS源码分析——从RenentrantLock初窥AQS（1）
+title:      AQS源码分析（1）——从RenentrantLock初窥AQS
 subtitle:   公平锁和非公平锁获取释放锁浅析
 date:       2019-07-07
 author:     iamwzt
