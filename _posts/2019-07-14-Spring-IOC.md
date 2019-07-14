@@ -131,6 +131,7 @@ public class ClassPathXmlApplicationContext extends AbstractXmlApplicationContex
 
 ### `refresh()`
 > AbstractApplicationContext.java
+
 ```java
 public void refresh() throws BeansException, IllegalStateException {
     // 加锁，保证同时只能进行一个refresh
@@ -206,6 +207,7 @@ public void refresh() throws BeansException, IllegalStateException {
 
 #### 创建容器前的准备工作：`prepareRefresh()`
 > AbstractApplicationContext.java
+
 ```java
 protected void prepareRefresh() {
 	// 记录启动时间.
@@ -238,6 +240,7 @@ protected void prepareRefresh() {
 
 #### 注册Bean到工厂中：`obtainFreshBeanFactory()`
 > AbstractApplicationContext.java
+
 ```java
 protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
     // 关闭旧的BeanFactory（若有）
@@ -247,6 +250,7 @@ protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
 }
 ```
 > AbstractRefreshableApplicationContext.java
+
 ```java
 protected final void refreshBeanFactory() throws BeansException {
     // 如果 ApplicationContext 中已经加载过 BeanFactory 了，销毁所有 Bean，关闭 BeanFactory
@@ -293,6 +297,7 @@ protected final void refreshBeanFactory() throws BeansException {
 简单来说，Bean和BeanDefinition 类似于 实例和类的关系吧。
 
 ##### `BeanDefinition`定义
+
 ```java
 // 节省篇幅，省略所有set方法对应的get方法
 public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
@@ -372,6 +377,7 @@ public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
 先看第一个：
 ##### `customizeBeanFactory`
 > 这个比较简单，就是设置两个Boolean值
+
 ```java
 protected void customizeBeanFactory(DefaultListableBeanFactory beanFactory) {
     // 是否允许Bean的定义覆盖
@@ -388,6 +394,7 @@ protected void customizeBeanFactory(DefaultListableBeanFactory beanFactory) {
 
 ##### 重头戏：`loadBeanDefinitions`
 > AbstractXmlApplicationContext.java
+
 ```java
 protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) throws BeansException, IOException {
     // 通过一个 XmlBeanDefinitionReader 来加载Bean.
@@ -420,7 +427,9 @@ protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) throws BeansE
     }
 }
 ```
+
 > AbstractBeanDefinitionReader.java
+
 ```java
 @Override
 public int loadBeanDefinitions(Resource... resources) throws BeanDefinitionStoreException {
@@ -434,7 +443,9 @@ public int loadBeanDefinitions(Resource... resources) throws BeanDefinitionStore
     return count;
 }
 ```
+
 > XmlBeanDefinitionReader.java
+
 ```java
 @Override
 public int loadBeanDefinitions(Resource resource) throws BeanDefinitionStoreException {
@@ -507,7 +518,9 @@ public int registerBeanDefinitions(Document doc, Resource resource) throws BeanD
     return getRegistry().getBeanDefinitionCount() - countBefore;
 }
 ```
+
 > DefaultBeanDefinitionDocumentReader.java
+
 ```java
 @Override
 public void registerBeanDefinitions(Document doc, XmlReaderContext readerContext) {
@@ -570,12 +583,14 @@ protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate d
     }
 }
 ```
+
 可以看到解析BeanDefinition分成两种：
 1. Default Element: 即` xmlns="http://www.springframework.org/schema/beans"`下的四个标签 `<import />`、`<alias />`、`<bean />` 和 `<beans />`
 2. Custom Element: 其他标签，如我们经常会使用到的 `<mvc />`、`<task />`、`<context />`、`<aop />`等。
 
 如果要解析这些非Default的标签，就要在XML头部引入相应的namespace及.xsd的文件路径，如下所示，同时代码中需要提供相应的 parser 来解析，
 如 MvcNamespaceHandler、TaskNamespaceHandler、ContextNamespaceHandler、AopNamespaceHandler 等。
+
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
 <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -595,6 +610,7 @@ protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate d
 
 回头再看看处理default标签的方法：
 > DefaultBeanDefinitionDocumentReader.java
+
 ```java
 private void parseDefaultElement(Element ele, BeanDefinitionParserDelegate delegate) {
     if (delegate.nodeNameEquals(ele, IMPORT_ELEMENT)) {
@@ -664,6 +680,7 @@ protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate d
 
 回到解析`<bean />`的方法中：
 > BeanDefinitionParserDelegate.java
+
 ```java
 public BeanDefinitionHolder parseBeanDefinitionElement(Element ele) {
     return parseBeanDefinitionElement(ele, null);
@@ -775,6 +792,7 @@ public AbstractBeanDefinition parseBeanDefinitionElement(
 ```
 到此，完成了一个`<bean />`到 `BeanDefinitionHolder`，回到解析`<bean />`的方法上：
 > DefaultBeanDefinitionDocumentReader.java
+
 ```java
 protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
     // 将 <bean /> 节点中的信息提取出来，然后封装到一个 BeanDefinitionHolder 中，细节往下看
@@ -808,6 +826,7 @@ public class BeanDefinitionHolder implements BeanMetadataElement {
 ```
 先来看看怎么注册Bean：
 > BeanDefinitionReaderUtils.java
+
 ```java
 public static void registerBeanDefinition(
         BeanDefinitionHolder definitionHolder, BeanDefinitionRegistry registry)
@@ -828,6 +847,7 @@ public static void registerBeanDefinition(
 }
 ```
 > DefaultListableBeanFactory.java
+
 ```java
 public void registerBeanDefinition(String beanName, BeanDefinition beanDefinition)
         throws BeanDefinitionStoreException {
@@ -910,6 +930,7 @@ OK，到这里为止，已经注册了各bd，并发送了注册事件。下面�
 
 #### 准备Bean容器`prepareBeanFactory`
 > AbstractApplicationContext.java
+
 ```java
 protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
     // 设置 BeanFactory 的类加载器，BeanFactory 需要加载类，也就需要类加载器，
@@ -978,6 +999,7 @@ protected void prepareBeanFactory(ConfigurableListableBeanFactory beanFactory) {
 
 （这里我们跳过了`refresh`中的一大段，直接进入重点关注对象）
 > AbstractApplicationContext.java
+
 ```java
 protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory beanFactory) {
     // 初始化名为 conversionService 的bean
@@ -1014,6 +1036,7 @@ protected void finishBeanFactoryInitialization(ConfigurableListableBeanFactory b
 }
 ```
 > DefaultListableBeanFactory.java
+
 ```java
 @Override
 public void preInstantiateSingletons() throws BeansException {
@@ -1075,6 +1098,7 @@ public void preInstantiateSingletons() throws BeansException {
 ```
 接下来讲一下getBean()
 > AbstractBeanFactory.java
+
 ```java
 @Override
 public Object getBean(String name) throws BeansException {
@@ -1240,6 +1264,7 @@ protected <T> T doGetBean(final String name, @Nullable final Class<T> requiredTy
 ```
 接下来要讲的是`createBean`方法：
 > AbstractBeanFactory.java
+
 ```java
 protected abstract Object createBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args)
         throws BeanCreationException;
@@ -1262,6 +1287,7 @@ public class MessageServiceImpl implements MessageService {
 ```
 这是一种混用的场景，Spring会自动处理这种情况。知道这回事就行，继续向前：
 > AbstractAutowireCapableBeanFactory.java
+
 ```java
 @Override
 protected Object createBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args)
@@ -1314,6 +1340,7 @@ protected Object createBean(String beanName, RootBeanDefinition mbd, @Nullable O
 }
 ```
 `doCreateBean()`
+
 ```java
 protected Object doCreateBean(final String beanName, final RootBeanDefinition mbd, final @Nullable Object[] args)
         throws BeanCreationException {
@@ -1420,6 +1447,7 @@ protected Object doCreateBean(final String beanName, final RootBeanDefinition mb
 
 先看创建实例的方法：
 > AbstractAutowireCapableBeanFactory.java
+
 ```java
 protected BeanWrapper createBeanInstance(String beanName, RootBeanDefinition mbd, @Nullable Object[] args) {
     // 再次确保bean的class是否已经加载
@@ -1509,6 +1537,7 @@ protected BeanWrapper instantiateBean(final String beanName, final RootBeanDefin
 ```
 
 > SimpleInstantiationStrategy.java
+
 ```java
 @Override
 public Object instantiate(RootBeanDefinition bd, @Nullable String beanName, BeanFactory owner) {
@@ -1550,6 +1579,7 @@ public Object instantiate(RootBeanDefinition bd, @Nullable String beanName, Bean
 ```
 再看看依赖属性注入的方法：
 > AbstractAutowireCapableBeanFactory.java
+
 ```java
 protected void populateBean(String beanName, RootBeanDefinition mbd, @Nullable BeanWrapper bw) {
     if (bw == null) {
@@ -1642,6 +1672,7 @@ protected void populateBean(String beanName, RootBeanDefinition mbd, @Nullable B
 ```
 最后讲讲回调处理：
 > AbstractAutowireCapableBeanFactory.java
+
 ```java
 protected Object initializeBean(final String beanName, final Object bean, @Nullable RootBeanDefinition mbd) {
     if (System.getSecurityManager() != null) {
@@ -1679,3 +1710,4 @@ protected Object initializeBean(final String beanName, final Object bean, @Nulla
     return wrappedBean;
 }
 ```
+
