@@ -362,6 +362,7 @@ public interface BeanDefinition extends AttributeAccessor, BeanMetadataElement {
     String getResourceDescription();
     @Nullable
     BeanDefinition getOriginatingBeanDefinition();    
+}
 ```
 众多依赖信息，先求个眼熟。但是可以看到，里头并没有`getInstance`之类的方法来获取实例，这点后面会说。
 
@@ -393,7 +394,7 @@ protected void customizeBeanFactory(DefaultListableBeanFactory beanFactory) {
 ```
 
 ##### 重头戏：`loadBeanDefinitions`
-> AbstractXmlApplicationContext.java
+> AbstractXmlApplicationContext.java<br>
 
 ```java
 protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) throws BeansException, IOException {
@@ -416,6 +417,7 @@ protected void loadBeanDefinitions(DefaultListableBeanFactory beanFactory) throw
 // 通过Reader加载XML文件
 // 两个分支殊途同归，最终都会根据Resource来加载
 // 因此我们就跟着第一个分支走
+// 入参是 XmlBeanDefinitionReader，该方法实际是委托 XmlBeanDefinitionReader 来执行的
 protected void loadBeanDefinitions(XmlBeanDefinitionReader reader) throws BeansException, IOException {
     Resource[] configResources = getConfigResources();
     if (configResources != null) {
@@ -1711,3 +1713,67 @@ protected Object initializeBean(final String beanName, final Object bean, @Nulla
 }
 ```
 
+## 总结
+### 加载Bean
+```
+起点：
+new ClassPathXmlApplicationContext("classpath:application.xml")
+↓
+↓
+↓
+refresh()
+↓
+↓
+↓
+obtainFreshBeanFactory()
+↓
+↓
+↓
+refreshBeanFactory()
+↓
+↓
+↓
+loadBeanDefinitions(DefaultListableBeanFactory)	//	到这一步，算是加载Bean的起点了，位置：AbstractRefreshableApplicationContext.java
+↓
+↓
+↓
+loadBeanDefinitions(XmlBeanDefinitionReader)	//	委托给XmlBeanDefinitionReader去实际执行，位置：AbstractXmlApplicationContext.java
+↓
+↓
+↓
+loadBeanDefinitions(Resource...)				//	位置：XmlBeanDefinitionReader.java
+loadBeanDefinitions(String...)
+↓
+↓
+↓
+loadBeanDefinitions(Resource)					//	Resource[] 和 String[] 类型的参数的方法最终都会到这一步，
+↓
+↓	//	new EncodedResource(resource)
+↓
+loadBeanDefinitions(EncodedResource)
+↓
+↓	//	EncodedResource → Resource → InputStream --> InputSource, EncodedResource → Resource
+↓
+doLoadBeanDefinitions(InputSource, Resource)
+↓
+↓	//	InputSource + Resource ==> Document
+↓
+registerBeanDefinitions(Document, Resource)
+↓
+↓	//	createReaderContext(resource) ==> XmlReaderContext
+↓
+registerBeanDefinitions(Document, XmlReaderContext)	//	位置：DefaultBeanDefinitionDocumentReader.java
+↓
+↓
+↓
+doRegisterBeanDefinitions(Element)	// 从root节点开始解析，到这一步才算真正开始解析了，前面都是准备工作
+↓
+↓
+↓
+parseBeanDefinitions(Element, BeanDefinitionParserDelegate)
+↓
+↓
+↓
+parseDefaultElement(Element, BeanDefinitionParserDelegate)	// 默认标签
+BeanDefinitionParserDelegate::parseCustomElement(Element)	// 自定义标签
+```
