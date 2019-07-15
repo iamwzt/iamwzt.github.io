@@ -1714,66 +1714,7 @@ protected Object initializeBean(final String beanName, final Object bean, @Nulla
 ```
 
 ## 总结
-### 加载Bean
-```
-起点：
-new ClassPathXmlApplicationContext("classpath:application.xml")
-↓
-↓
-↓
-refresh()
-↓
-↓
-↓
-obtainFreshBeanFactory()
-↓
-↓
-↓
-refreshBeanFactory()
-↓
-↓
-↓
-loadBeanDefinitions(DefaultListableBeanFactory)	//	到这一步，算是加载Bean的起点了，位置：AbstractRefreshableApplicationContext.java
-↓
-↓
-↓
-loadBeanDefinitions(XmlBeanDefinitionReader)	//	委托给XmlBeanDefinitionReader去实际执行，位置：AbstractXmlApplicationContext.java
-↓
-↓
-↓
-loadBeanDefinitions(Resource...)				//	位置：XmlBeanDefinitionReader.java
-loadBeanDefinitions(String...)
-↓
-↓
-↓
-loadBeanDefinitions(Resource)					//	Resource[] 和 String[] 类型的参数的方法最终都会到这一步，
-↓
-↓	//	new EncodedResource(resource)
-↓
-loadBeanDefinitions(EncodedResource)
-↓
-↓	//	EncodedResource → Resource → InputStream --> InputSource, EncodedResource → Resource
-↓
-doLoadBeanDefinitions(InputSource, Resource)
-↓
-↓	//	InputSource + Resource ==> Document
-↓
-registerBeanDefinitions(Document, Resource)
-↓
-↓	//	createReaderContext(resource) ==> XmlReaderContext
-↓
-registerBeanDefinitions(Document, XmlReaderContext)	//	位置：DefaultBeanDefinitionDocumentReader.java
-↓
-↓
-↓
-doRegisterBeanDefinitions(Element)	// 从root节点开始解析，到这一步才算真正开始解析了，前面都是准备工作
-↓
-↓
-↓
-parseBeanDefinitions(Element, BeanDefinitionParserDelegate)
-↓
-↓
-↓
-parseDefaultElement(Element, BeanDefinitionParserDelegate)	// 默认标签
-BeanDefinitionParserDelegate::parseCustomElement(Element)	// 自定义标签
-```
+### 加载BeanDefinition
+加载`BeanDefinition`是注册Bean到工厂中的关键方法，其大致调用流程如下图所示：
+![加载BeanDefinition流程](https://wzt-img.oss-cn-chengdu.aliyuncs.com/loadBeanDefinitions.png)
+
