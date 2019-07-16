@@ -1,6 +1,7 @@
 ### 线程池总览
 先看一下线程池的几个“直系”关系：
-![线程池直系关系图](https://www.javadoop.com/blogimages/java-thread-pool/1.jpg)
+
+![线程池直系关系图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/ThreadPoolExecutor-Simple.png)
 
 - `Executor`位于最顶层，也是最简单的，只有一个`executor(Runnable)`方法;
 - `ExecutorService`继承了`Executor`接口，在其基础上增加了诸如`shutdown()`的管理方法；
