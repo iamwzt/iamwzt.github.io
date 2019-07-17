@@ -1,9 +1,20 @@
+---
+layout:     post
+title:      线程池源码解析
+subtitle:   
+date:       2019-07-18
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - ThreadPool
+---
 ### 线程池总览
 先看一下线程池的几个“直系”关系：
 
 ![线程池直系关系图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/ThreadPoolExecutor-Simple.png)
 
-- `Executor`位于最顶层，也是最简单的，只有一个`executor(Runnable)`方法;
+- `Executor`位于最顶层，也是最简单的，只有一个`execute(Runnable)`方法;
 - `ExecutorService`继承了`Executor`接口，在其基础上增加了诸如`shutdown()`的管理方法；
 - `AbstractExecutorService`则是实现了`ExecutorService`的抽象类，实现了一些有用的方法供子类直接调用；
 - `ThreadPoolExecutor`是直接可以拿来用的类，提供了关于线程池的丰富的功能。
@@ -15,6 +26,7 @@
 - `Future`这边的类，则是用来支持线程执行返回结果的，在线程池中，每个任务都是包装成`FutureTask`给线程执行的；
 - `BlockingQueue`是线程池中的等待队列，其具体作用在下文源码分析中会讲到。
 
+对相关的类有了一些概念后，下面便开始源码之旅。
 ### Executor 接口
 ```java
 public interface Executor {
@@ -231,7 +243,7 @@ public ThreadPoolExecutor(int corePoolSize,
 7. handler：拒绝策略，当所有线程都忙，队列也满时，对新提交任务的处理策略
 
 除了上述7个参数外，还有几个重要参数，也在这一并罗列：
-#### 状态 + 线程数 = ctl
+#### ctl: 状态 + 线程数
 `ThreadPoolExecutor`用一个32位数来同时表示线程池的状态及线程数量：
 ```java
 private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
@@ -271,16 +283,417 @@ private static boolean isRunning(int c) {
 }
 ```
 这里讲到了线程池的几个状态：
-1. RUNNING：运行状态，此时能接收并处理任务，
-2. SHUTDOWN：不接收新任务，但会执行等待队列里的任务
-3. STOP：不接收新任务，不执行等待队列的任务，中断正在执行的任务
-4. TIDYING：任务执行完，线程数为0，将执行钩子方法terminated()
-5. TERMINATED：terminated()执行完毕后的状态
+1. `RUNNING`：运行状态，此时能接收并处理任务，
+2. `SHUTDOWN`：不接收新任务，但会执行等待队列里的任务
+3. `STOP`：不接收新任务，不执行等待队列的任务，中断正在执行的任务
+4. `TIDYING`：任务执行完，线程数为0，将执行钩子方法terminated()
+5. `TERMINATED`：terminated()执行完毕后的状态
 
 几种状态的转换：
-- RUNNING -> SHUTDOWN：调用了`shutdown()`方法
-- (RUNNING or SHUTDOWN) -> STOP：调用了 `shutdownNow()`
-- SHUTDOWN -> TIDYING：等待队列及线程池为空
-- STOP -> TIDYING：线程池为空
-- TIDYING -> TERMINATED：钩子方法`terminated()`执行完毕
+- `RUNNING` -> `SHUTDOWN`：调用了`shutdown()`方法
+- (`RUNNING` or `SHUTDOWN`) -> `STOP`：调用了 `shutdownNow()`
+- `SHUTDOWN` -> `TIDYING`：等待队列及线程池为空
+- `STOP` -> `TIDYING`：线程池为空
+- `TIDYING` -> `TERMINATED`：钩子方法`terminated()`执行完毕
 
+如图所示：
+
+![线程池状态图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/ThreadPoolStatus.png)
+
+#### Worker: 工作线程
+在线程池内部，有一个重要的类，其名为 `Worker`，是用来执行任务的线程。
+`Worker`实现了`Runnable`接口，还继承了`AbstractQueuedSynchronized`抽象类。可以看到在JUC包中AQS真是无处不在啊。
+```java
+private final class Worker extends AbstractQueuedSynchronizer implements Runnable {
+    // 该类永不会被序列化，有这个参数只是为了消除javac的warning
+    private static final long serialVersionUID = 6138294804551838833L;
+
+    // 线程在此
+    final Thread thread;
+    // 创建线程时若没有指定任务，就为null
+    Runnable firstTask;
+    // 线程完成的任务数
+    volatile long completedTasks;
+
+    Worker(Runnable firstTask) {
+        setState(-1); // inhibit interrupts until runWorker
+        this.firstTask = firstTask;
+        this.thread = getThreadFactory().newThread(this);
+    }
+
+    // 调用了外部的方法
+    public void run() {
+        runWorker(this);
+    }
+
+    // 省略AQS相关的方法
+    ...
+}
+```
+#### execute()
+有了上面的铺垫，接下来我们来看一下线程池的核心方法`execute()`。
+```java
+public void execute(Runnable command) {
+    if (command == null)
+        throw new NullPointerException();
+
+    int c = ctl.get();
+    // 当线程数 < 核心线程数时，就创建一个新的线程（Worker）
+    // 并将当前任务作为firstWork
+    if (workerCountOf(c) < corePoolSize) {
+        // 如果添加成功，就返回了
+        // 添加失败说明线程池不允许提交任务了
+        if (addWorker(command, true))
+            return;
+        c = ctl.get();
+    }
+    // 到这说明：1、线程数 > 核心线程数；2、线程池不允许提交线程
+    
+    // 如果线程池处于RUNNING，那就将任务放入任务队列中
+    if (isRunning(c) && workQueue.offer(command)) {
+        // 任务提交成功
+        int recheck = ctl.get();
+        // 再检查线程池是否还是RUNNING，不是就从队列中移除该任务，并执行拒绝策略
+        if (! isRunning(recheck) && remove(command))
+            reject(command);
+        // 若工作线程数为0，则创建新线程
+        else if (workerCountOf(recheck) == 0)
+            addWorker(null, false);
+    }
+    // 若加入队列失败，说明线程池已经SHUTDOWN，或者队列已经饱和，执行拒绝策略
+    else if (!addWorker(command, false))
+        reject(command);
+}
+```
+
+```java
+// 可能由于线程池STOP、SHUTDOWN，或者线程工厂创建线程失败，或者OOM异常，导致失败返回false
+// firstTask可以为null
+// core为true，则以corePoolSize作为线程数上限，否则以maximumPoolSize为线程数上限
+private boolean addWorker(Runnable firstTask, boolean core) {
+    retry:
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);
+
+        // 两种情况会创建新的worker：
+        // 1. 线程池处于RUNNING状态；
+        // 2. 线程池为SHUTDOWN，firstTask为null，且任务队列不为空
+        // 第1个好理解，第2个可以从SHUTDOWN这个状态的语义去理解：
+        // 即不允许提交任务，但是还会执行队列中的任务
+        if (rs >= SHUTDOWN &&
+            ! (rs == SHUTDOWN &&
+               firstTask == null &&
+               ! workQueue.isEmpty()))
+            return false;
+
+        for (;;) {
+            int wc = workerCountOf(c);
+            // 线程数大于物理的上限，或者大于设定的上限，就返回false
+            if (wc >= CAPACITY ||
+                wc >= (core ? corePoolSize : maximumPoolSize))
+                return false;
+            // 线程数CAS+1，若成功则跳出外层循环
+            if (compareAndIncrementWorkerCount(c))
+                break retry;
+            c = ctl.get();  // Re-read ctl
+            // 若状态和开始时不一致，则重试
+            if (runStateOf(c) != rs)
+                continue retry;
+            // 到这说明CAS失败了，在内层重试
+        }
+    }
+
+    // worker是否启动
+    boolean workerStarted = false;
+    // worker是否已添加到workers这个HashSet中
+    boolean workerAdded = false;
+    Worker w = null;
+    try {
+        w = new Worker(firstTask);
+        final Thread t = w.thread;
+        if (t != null) {
+            // 持有这个线程池的全局锁，才能避免在下面的过程中，线程池被干掉了
+            final ReentrantLock mainLock = this.mainLock;
+            mainLock.lock();
+            try {
+                int rs = runStateOf(ctl.get());
+
+                if (rs < SHUTDOWN ||
+                    (rs == SHUTDOWN && firstTask == null)) {
+                    // 若worker里的线程已经被启动，就抛出异常
+                    if (t.isAlive())
+                        throw new IllegalThreadStateException();
+                    workers.add(w);
+                    // largestPoolSize 用来记录线程池中线程数的最大值
+                    int s = workers.size();
+                    if (s > largestPoolSize)
+                        largestPoolSize = s;
+                    workerAdded = true;
+                }
+            } finally {
+                mainLock.unlock();
+            }
+            // 添加成功就启动线程
+            if (workerAdded) {
+                t.start();
+                workerStarted = true;
+            }
+        }
+    } finally {
+        // 若启动失败就做一些清理动作
+        if (! workerStarted)
+            addWorkerFailed(w);
+    }
+    return workerStarted;
+}
+```
+简单看下 `addWorkerFailed`
+```java
+// 1. 移除Worker
+// 2. 有效线程数-1
+// 3. 有worker线程移除，可能是最后一个线程退出需要尝试终止线程池
+private void addWorkerFailed(Worker w) {
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        if (w != null)
+            workers.remove(w);
+        decrementWorkerCount();
+        tryTerminate();
+    } finally {
+        mainLock.unlock();
+    }
+}
+```
+刚才在介绍Worker时说到，启动worker线程时会执行`runWorker()`方法：
+```java
+final void runWorker(Worker w) {
+    Thread wt = Thread.currentThread();
+    Runnable task = w.firstTask;
+    w.firstTask = null;
+    w.unlock(); // allow interrupts
+    boolean completedAbruptly = true;
+    try {
+        while (task != null || (task = getTask()) != null) {
+            w.lock();
+
+            // 若线程池状态大于等于STOP，则要中断该线程
+            if ((runStateAtLeast(ctl.get(), STOP) ||
+                 (Thread.interrupted() && runStateAtLeast(ctl.get(), STOP))) &&
+                !wt.isInterrupted())
+                wt.interrupt();
+            try {
+                // 钩子方法，留给需要的子类实现
+                beforeExecute(wt, task);
+                Throwable thrown = null;
+                try {
+                    task.run();
+                } catch (RuntimeException x) {
+                    thrown = x; throw x;
+                } catch (Error x) {
+                    thrown = x; throw x;
+                } catch (Throwable x) {
+                    thrown = x; throw new Error(x);
+                } finally {
+                    // 钩子方法，留给需要的子类实现
+                    afterExecute(task, thrown);
+                }
+            } finally {
+                // task置空，准备获取下个任务
+                task = null;
+                w.completedTasks++;
+                w.unlock();
+            }
+        }
+        // 执行到这，说明是没有初始任务，队列中也没有任务了，正常退出
+        completedAbruptly = false;
+    } finally {
+        // 根据completedAbruptly可以知道是正常退出或异常
+        processWorkerExit(w, completedAbruptly);
+    }
+}
+```
+再来看一下获取任务的方法`getTask()`
+```java
+private Runnable getTask() {
+    boolean timedOut = false; // Did the last poll() time out?
+
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);
+
+        // 线程池状态为STOP、TIDYING、TERMINATED
+        // 或为SHUTDOWN，且队列为空
+        // 则将线程数-1，并返回null，让worker正常退出
+        if (rs >= SHUTDOWN && (rs >= STOP || workQueue.isEmpty())) {
+            decrementWorkerCount();
+            return null;
+        }
+
+        int wc = workerCountOf(c);
+
+        // 若允许销毁核心线程，或线程数大于核心线程，则当前线程可以回收
+        boolean timed = allowCoreThreadTimeOut || wc > corePoolSize;
+
+        // 线程数 > 最大线程数（重新设置，改小了最大线程数），或者超时了
+        // 同时线程数 > 1 并且队列为空
+        // 就要CAS减少线程数并返回null了，CAS失败就重来这一流程吧
+        if ((wc > maximumPoolSize || (timed && timedOut))
+            && (wc > 1 || workQueue.isEmpty())) {
+            if (compareAndDecrementWorkerCount(c))
+                return null;
+            continue;
+        }
+
+        try {
+            // 若当前线程允许回收，则用带超时的取任务方式
+            Runnable r = timed ?
+                workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) :
+                workQueue.take();
+            if (r != null)
+                return r;
+            timedOut = true;
+        } catch (InterruptedException retry) {
+            timedOut = false;
+        }
+    }
+}
+```
+总结一下，`getTask()`有三种情况会返回null
+1. 线程池状态为STOP、TIDYING、TERMINATED，或为SHUTDOWN，且队列为空，则返回null；
+2. 调小了最大线程数，则超出这个数值的线程将被关闭，要返回null；
+3. 超时了，并且允许销毁当前线程（默认核心线程数内的线程不会被销毁），则返回null。
+
+返回null后，会导致runWorker()方法中跳出while循环，然后调用`processWorkerExit`进行将worker移除。
+
+```java
+private void processWorkerExit(Worker w, boolean completedAbruptly) {
+    // 如果runWorker()中是因为中断意外退出循环，则在这里需要处理worker数量
+    // 正常退出的话，已经在getTask()里处理了
+    if (completedAbruptly)
+        decrementWorkerCount();
+
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        // 统计总任务处理数
+        completedTaskCount += w.completedTasks;
+        workers.remove(w);
+    } finally {
+        mainLock.unlock();
+    }
+
+    tryTerminate();
+
+    int c = ctl.get();
+    // 若线程池还没停止（RUNNING或SHUTDOWN），还可以执行任务
+    if (runStateLessThan(c, STOP)) {
+        // 若worker并非意外退出
+        if (!completedAbruptly) {
+            // 计算线程最小数，若允许核心线程超时则为0，否则为核心线程数
+            int min = allowCoreThreadTimeOut ? 0 : corePoolSize;
+            // 若还有任务，且允许核心线程超时，则最小数为1
+            if (min == 0 && ! workQueue.isEmpty())
+                min = 1;
+            // 若当前线程数不小于最小数，则直接返回
+            // 否则需要再创一个worker来执行任务
+            if (workerCountOf(c) >= min)
+                return; // replacement not needed
+        }
+        addWorker(null, false);
+    }
+}
+```
+添加worker失败，会尝试terminate线程池：
+```java
+final void tryTerminate() {
+    for (;;) {
+        int c = ctl.get();
+        // 三种情况下会直接返回
+        // 1. 还在RUNNING；
+        // 2. TIDYING或TERMINATED，其它线程再终结；
+        // 3. SHUTDOWN，但任务队列还不为空
+        if (isRunning(c) ||
+            runStateAtLeast(c, TIDYING) ||
+            (runStateOf(c) == SHUTDOWN && ! workQueue.isEmpty()))
+            return;
+        
+        // 线程数不为0，则中断1个空闲worker（获取任务时阻塞的）
+        // 并借由此将其移除，同时扩散terminate信号
+        if (workerCountOf(c) != 0) { // Eligible to terminate
+            interruptIdleWorkers(ONLY_ONE);
+            return;
+        }
+
+        final ReentrantLock mainLock = this.mainLock;
+        mainLock.lock();
+        try {
+            // 将状态设置为TIDYING状态
+            if (ctl.compareAndSet(c, ctlOf(TIDYING, 0))) {
+                try {
+                    // 供用户实现
+                    terminated();
+                } finally {
+                    // 调完terminated()就将状态设置为TERMINTAED状态了
+                    ctl.set(ctlOf(TERMINATED, 0));
+                    termination.signalAll();
+                }
+                return;
+            }
+        } finally {
+            mainLock.unlock();
+        }
+        // CAS失败则重试
+    }
+}
+```
+
+#### 拒绝策略
+最后来讲讲拒绝策略。
+在`ThreadPoolExecutor`中，已经有默认实现的四种拒绝策略了：
+```java
+// 抛异常
+public static class AbortPolicy implements RejectedExecutionHandler {
+    public AbortPolicy() { }
+
+    public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+        throw new RejectedExecutionException("Task " + r.toString() +
+                                             " rejected from " +
+                                             e.toString());
+    }
+}
+
+// 忽略
+public static class DiscardPolicy implements RejectedExecutionHandler {
+    public DiscardPolicy() { }
+
+    public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+    }
+}
+
+// 丢弃最早的任务
+public static class DiscardOldestPolicy implements RejectedExecutionHandler {
+    public DiscardOldestPolicy() { }
+
+    public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+        if (!e.isShutdown()) {
+            e.getQueue().poll();
+            e.execute(r);
+        }
+    }
+}
+
+// 提交任务的线程自己执行
+public static class CallerRunsPolicy implements RejectedExecutionHandler {
+    public CallerRunsPolicy() { }
+
+    public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
+        if (!e.isShutdown()) {
+            r.run();
+        }
+    }
+}
+```
+
+完！
