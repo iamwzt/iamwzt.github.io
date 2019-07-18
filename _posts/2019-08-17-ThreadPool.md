@@ -650,7 +650,7 @@ final void tryTerminate() {
 ```
 
 #### 拒绝策略
-最后来讲讲拒绝策略。
+
 在`ThreadPoolExecutor`中，已经有默认实现的四种拒绝策略了：
 ```java
 // 抛异常
@@ -695,5 +695,48 @@ public static class CallerRunsPolicy implements RejectedExecutionHandler {
     }
 }
 ```
+其中提交任务的线程自己执行这一策略可以实现一定程度的系统平滑降级，why？
 
+- 当线程池已经饱和，无能力继续向其提交新任务时，由提交任务的线程（T1）自己执行；
+- 在执行过程中，T1无法产生新的任务，线程池也可以在此期间减轻负荷量；
+- 若仍有源源不断的新的TCP请求到来，将会阻塞在TCP的缓冲区；
+- 若TCP的缓冲区满，客户端才会收到报错信息
+#### 关闭线程池
+```java
+public void shutdown() {
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        // 若有安全管理器，则需要校验是否有权限
+        checkShutdownAccess();
+        // 将线程池状态设置为SHUTDOWN状态，若状态已经更大，则不用管
+        advanceRunState(SHUTDOWN);
+        // 中断空闲的工作线程
+        interruptIdleWorkers();
+        // 为 ScheduledThreadPoolExecutor 准备的钩子方法
+        onShutdown();
+    } finally {
+        mainLock.unlock();
+    }
+    tryTerminate();
+}
+```
+```java
+public List<Runnable> shutdownNow() {
+    List<Runnable> tasks;
+    final ReentrantLock mainLock = this.mainLock;
+    mainLock.lock();
+    try {
+        checkShutdownAccess();
+        advanceRunState(STOP);
+        interruptWorkers();
+        // 从任务队列中获取未开始执行的任务列表
+        tasks = drainQueue();
+    } finally {
+        mainLock.unlock();
+    }
+    tryTerminate();
+    return tasks;
+}
+```
 完！
