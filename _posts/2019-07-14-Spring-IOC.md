@@ -1316,7 +1316,10 @@ protected Object createBean(String beanName, RootBeanDefinition mbd, @Nullable O
     }
 
     try {
-        // 让 InstantiationAwareBeanPostProcessor 在这一步有机会返回代理，AOP有关
+        // 让 InstantiationAwareBeanPostProcessor 在这一步有机会返回代理，
+	// 但前提是对于相应的 bean 我们有自定义的 TargetSource 实现；
+	// 注意：这里是在“实例化”bean的前后进行操作
+	// 而AOP中生成bean代理的操作是在实例化后初始化的前后进行操作
         Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
         if (bean != null) {
             return bean;
