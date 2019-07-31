@@ -1,3 +1,4 @@
+转自[Netty 源码解析系列](https://www.javadoop.com/post/netty-part-1)
 ### 首先来看一下Netty实现的Echo是什么样的
 所谓Echo，中文名“回声”，就是客户端向服务端发送什么，服务端就给客户端回什么。
 
