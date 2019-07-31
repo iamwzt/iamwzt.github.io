@@ -1,3 +1,4 @@
+转自[Netty 源码解析（二） - Netty 中的 Channel](https://www.javadoop.com/post/netty-part-2)
 ### Netty中的Channel
 
 话接上文，Netty 中的 Channel 没有直接使用 Java 原生的 ServerSocketChannel 和 SocketChannel，而是包装了 NioServerSocketChannel 和 NioSocketChannel 与之对应。
