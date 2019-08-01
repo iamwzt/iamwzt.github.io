@@ -7,14 +7,14 @@
 final ChannelFuture initAndRegister() {
     Channel channel = null;
     try {
-        // 1. 实例化 Channel
+        // （1） 实例化 Channel
         channel = channelFactory.newChannel();
-        // 2 对于 Bootstrap 和 ServerBootstrap，这里面有些不一样
+        // （2） 对于 Bootstrap 和 ServerBootstrap，这里面有些不一样
         init(channel);
     } catch (Throwable t) {
         // ...
     }
-    // 3 我们这里要说的是这行
+    // （3） 我们这里要说的是这行
     ChannelFuture regFuture = config().group().register(channel);
     if (regFuture.cause() != null) {
         if (channel.isRegistered()) {
@@ -26,8 +26,9 @@ final ChannelFuture initAndRegister() {
     return regFuture;
 }
 ```
-**initAndRegister()** 这个方法我们已经接触过两次了。前面介绍了（1）Channel 的实例化，实例化过程中，会执行 Channel 内部 Unsafe 和 Pipeline 的实例化；
-以及在上面（2）init(channel) 方法中，会往 pipeline 中添加 handler（pipeline 此时是 **head + channelnitializer + tail**）。
+**initAndRegister()** 这个方法我们已经接触过两次了。
+在讲Channel的一节中介绍了（1）Channel 的实例化，实例化过程中，会执行 Channel 内部 Unsafe 和 Pipeline 的实例化；
+以及Pipeline一节中介绍的（2）init(channel) 方法中，会往 pipeline 中添加 handler（pipeline 此时是 **head + channelnitializer + tail**）。
 
 > 这节终于要揭秘 ChannelInitializer 中的 initChannel 方法了~
 
@@ -91,7 +92,7 @@ public final void register(EventLoop eventLoop, final ChannelPromise promise) {
     AbstractChannel.this.eventLoop = eventLoop;
     // 如果发起 register 动作的线程就是 eventLoop 实例中的线程，那么直接调用 register0(promise)
     // 对于我们来说，它不会进入到这个分支，
-    //     之所以有这个分支，是因为我们是可以 unregister，然后再 register 的，后面再仔细看
+    // 之所以有这个分支，是因为我们是可以 unregister，然后再 register 的，后面再仔细看
     if (eventLoop.inEventLoop()) {
         register0(promise);
     } else {
