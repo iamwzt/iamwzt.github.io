@@ -1,3 +1,5 @@
+转自[Netty 源码解析（八）: 回到 Channel 的 register 操作](https://www.javadoop.com/post/netty-part-8)
+
 再来看看前面的 register0(promise) 方法。
 在NioEventLoop工作流程中讲到，这个 register 任务进入到了 NioEventLoop 的 taskQueue 中，然后会启动 NioEventLoop 中的线程。
 该线程会轮询这个 taskQueue，然后执行这个 register 任务。
@@ -22,9 +24,11 @@ private void register0(ChannelPromise promise) {
         // 这一步也很关键，因为这涉及到了 ChannelInitializer 的 init(channel)
         // 我们之前说过，init 方法会将 ChannelInitializer 内部添加的 handlers 添加到 pipeline 中
         pipeline.invokeHandlerAddedIfNeeded();
+        
         // 设置当前 promise 的状态为 success
         //   因为当前 register 方法是在 eventLoop 中的线程中执行的，需要通知提交 register 操作的线程
         safeSetSuccess(promise);
+        
         // 当前的 register 操作已经成功，该事件应该被 pipeline 上
         //   所有关心 register 事件的 handler 感知到，往 pipeline 中扔一个事件        
         pipeline.fireChannelRegistered();
@@ -108,7 +112,7 @@ private boolean initChannel(ChannelHandlerContext ctx) throws Exception {
     return false;
 }
 ```
-我们前面也说过，ChannelInitializer 的 init(channel) 被执行以后，那么其内部添加的 handlers 会进入到 pipeline 中，然后上面的 finally 块中将 ChannelInitializer 的实例从 pipeline 中删除，那么此时 pipeline 就算建立起来了，如下图：
+我们前面也说过，ChannelInitializer 的 init(channel) 被执行以后，其内部添加的 handlers 会进入到 pipeline 中，然后上面的 finally 块中将 ChannelInitializer 的实例从 pipeline 中删除，那么此时 pipeline 就算建立起来了，如下图：
 ![](https://www.javadoop.com/blogimages/netty-source/21.png)
 
 > 其实这里还有个问题，如果我们在 ChannelInitializer 中添加的是一个 ChannelInitializer 实例呢
@@ -128,3 +132,100 @@ public final ChannelPipeline fireChannelRegistered() {
     return this;
 }
 ```
+也就是说，我们往 pipeline 中扔了一个 **channelRegistered** 事件，这里的 register 属于 Inbound 事件，pipeline 接下来要做的就是执行 pipeline 中的 Inbound 类型的 handlers 中的 channelRegistered() 方法。
+
+从上面的代码，我们可以看出，往 pipeline 中扔出 **channelRegistered** 事件以后，第一个处理的 handler 是 **head**。
+
+接下来，我们还是跟着代码走，此时我们来到了 pipeline 的第一个节点 **head** 的处理中：
+> AbstractChannelHandlerContext.java
+
+```java
+static void invokeChannelRegistered(final AbstractChannelHandlerContext next) {
+    EventExecutor executor = next.executor();
+    // 执行 head 的 invokeChannelRegistered()
+    if (executor.inEventLoop()) {
+        next.invokeChannelRegistered();
+    } else {
+        executor.execute(new Runnable() {
+            @Override
+            public void run() {
+                next.invokeChannelRegistered();
+            }
+        });
+    }
+}
+
+// 也就是说，这里会先执行 head.invokeChannelRegistered() 方法，而且是放到 NioEventLoop 中的 taskQueue 中执行的：
+private void invokeChannelRegistered() {
+    if (invokeHandler()) {
+        try {
+            ((ChannelInboundHandler) handler()).channelRegistered(this);
+        } catch (Throwable t) {
+            notifyHandlerException(t);
+        }
+    } else {
+        fireChannelRegistered();
+    }
+}
+```
+我们去看 head 的 channelRegistered 方法：
+> DefaultChannelPipeline$HeadContext
+
+```java
+@Override
+public void channelRegistered(ChannelHandlerContext ctx) {
+    // 1. 这一步是 head 对于 channelRegistered 事件的处理。没有我们要关心的
+    invokeHandlerAddedIfNeeded();
+    // 2. 向后传播 Inbound 事件
+    ctx.fireChannelRegistered();
+}
+```
+然后 head 会执行 fireChannelRegister() 方法：
+```java
+@Override
+public ChannelHandlerContext fireChannelRegistered() {
+    // findContextInbound() 方法会沿着 pipeline 找到下一个 Inbound 类型的 handler
+    invokeChannelRegistered(findContextInbound(MASK_CHANNEL_REGISTERED));
+    return this;
+}
+```
+> **注意**：pipeline.fireChannelRegistered() 是将 channelRegistered 事件抛到 pipeline 中，pipeline 中的 handlers 准备处理该事件。
+而 context.fireChannelRegistered() 是一个 handler 处理完了以后，向后传播给下一个 handler。
+它们两个的方法名字是一样的，但是来自于不同的类。
+
+findContextInbound() 将找到下一个 Inbound 类型的 handler，然后又是重复上面的几个方法。
+
+说了这么多，我们的 register 操作算是真正完成了。
+
+下面，我们回到 initAndRegister 这个方法：
+```java
+final ChannelFuture initAndRegister() {
+    Channel channel = null;
+    try {
+        channel = channelFactory.newChannel();
+        init(channel);
+    } catch (Throwable t) {
+        // ...
+    }
+    // 刚说完这行
+    ChannelFuture regFuture = config().group().register(channel);
+    
+    // 如果在 register 的过程中，发生了错误
+    if (regFuture.cause() != null) {
+        if (channel.isRegistered()) {
+            channel.close();
+        } else {
+            channel.unsafe().closeForcibly();
+        }
+    }
+
+    // 如果到这里，说明后续可以进行 connect() 或 bind() 了，因为两种情况：
+    // 1. 如果 register 动作是在 eventLoop 中发起的，那么到这里的时候，register 一定已经完成
+    // 2. 如果 register 任务已经提交到 eventLoop 中，也就是进到了 eventLoop 中的 taskQueue 中，
+    //    由于后续的 connect 或 bind 也会进入到同一个 eventLoop 的 queue 中，所以一定是会先 register 成功，才会执行 connect 或 bind
+    return regFuture;
+}
+```
+我们要知道，不管是服务端的 NioServerSocketChannel 还是客户端的 NioSocketChannel，在 bind 或 connect 时，都会先进入 initAndRegister 这个方法，所以我们上面说的那些，对于两者都是通用的。
+
+大家要记住，register 操作是非常重要的，要知道这一步大概做了哪些事情，register 操作以后，将进入到 bind 或 connect 操作中。
