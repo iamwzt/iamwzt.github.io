@@ -113,3 +113,90 @@ tail 实现了 ChannelInboundHandler 接口，而 head 实现了 ChannelOutbound
 这里只是构造了 pipeline，并且添加了两个固定的 handler 到其中（head + tail），还不涉及到自定义的 handler 代码执行。我们回过头来看下面这段代码：
 ![](https://www.javadoop.com/blogimages/netty-source/13.png)
 
+这里调用 handler(…) 方法指定了一个 LoggingHandler 的实例，然后我们再进去下面的 bind(…) 方法中看看这个 LoggingHandler 实例是怎么进入到我们之前构造的 pipeline 内的。
+
+顺着 bind() 一直往前走，bind() -> doBind() -> initAndRegister()：
+```java
+final ChannelFuture initAndRegister() {
+    Channel channel = null;
+    try {
+        // 上面讲到，实例化一个Channel的时候，会同时构造一个pipeline实例
+        // 里头已经有了 head 和 tail 两个 handler
+        channel = channelFactory.newChannel();
+        // 现在重点在这 ↓
+        init(channel);
+    } catch (Throwable t) {
+        // ...       
+    }
+    // ...
+}
+```
+> ServerBootStrap.java
+
+```java
+@Override
+void init(Channel channel) throws Exception {
+    // ...
+    // 拿到刚刚创建的 channel 内部的 pipeline 实例
+    ChannelPipeline p = channel.pipeline();
+    // ...
+    // 开始往 pipeline 中添加一个 handler，这个 handler 是 ChannelInitializer 的实例
+    p.addLast(new ChannelInitializer<Channel>() {
+        // 我们以后会看到，下面这个 initChannel 方法何时会被调用
+        @Override
+        public void initChannel(final Channel ch) throws Exception {
+            final ChannelPipeline pipeline = ch.pipeline();
+            // 这个方法返回我们最开始指定的 LoggingHandler 实例
+            ChannelHandler handler = config.handler();
+            if (handler != null) {
+                // 添加 LoggingHandler
+                pipeline.addLast(handler);
+            }
+
+            ch.eventLoop().execute(new Runnable() {
+                @Override
+                public void run() {
+                    // 添加一个 handler 到 pipeline 中：ServerBootstrapAcceptor
+                    // 从名字可以看到，这个 handler 的目的是用于接收客户端请求
+                    pipeline.addLast(new ServerBootstrapAcceptor(
+                            ch, currentChildGroup, currentChildHandler, currentChildOptions, currentChildAttrs));
+                }
+            });
+        }
+    });
+}
+```
+这里涉及到 pipeline 中的辅助类 ChannelInitializer，它本身是一个 handler（Inbound 类型），但是它的作用和普通 handler 有点不一样，它纯碎是用来辅助将其他的 handler 加入到 pipeline 中的。
+
+可以稍微看一下 ChannelInitializer 的 initChannel 方法，有个简单的认识就好，此时的 pipeline 应该是这样的：
+![](https://www.javadoop.com/blogimages/netty-source/14.png)
+
+ChannelInitializer 的 initChannel(channel) 方法被调用的时候，会往 pipeline 中添加我们最开始指定的 **LoggingHandler** 和添加一个 **ServerBootstrapAcceptor**。
+但是我们现在还不知道这个 initChannel 方法何时会被调用。
+
+上面我们说的是作为服务端的 NioServerSocketChannel 的 pipeline，NioSocketChannel 也是差不多的，我们可以看一下 Bootstrap 类的 init(channel) 方法：
+```java
+void init(Channel channel) throws Exception {
+    ChannelPipeline p = channel.pipeline();
+    p.addLast(config.handler());
+    // ...
+}
+```
+![](https://www.javadoop.com/blogimages/netty-source/23.png)
+
+它和服务端 ServerBootstrap 要添加 ServerBootstrapAcceptor 不一样，它只需要将 EchoClient 类中的 ChannelInitializer 实例加进来就可以了，它的 ChannelInitializer 中添加了两个 handler，LoggingHandler 和 EchoClientHandler：
+
+![](https://www.javadoop.com/blogimages/netty-source/16.png)
+
+很显然，我们需要的是像 LoggingHandler 和 EchoClientHandler 这样的 handler，但是，它们现在还不在 pipeline 中，那么它们什么时候会真正进入到 pipeline 中呢？以后我们再揭晓。
+
+还有，为什么 Server 端我们指定的是一个 handler 实例，而 Client 指定的是一个 ChannelInitializer 实例？其实它们是可以随意搭配使用的，你甚至可以在 ChannelInitializer 实例中添加 ChannelInitializer 的实例。
+
+到这里。本节就要结束了。大家要记住 pipeline 现在的样子，**head + channelInitializer + tail**。
+
+本节没有介绍 handler 的向后传播，就是一个 handler 处理完了以后，怎么传递给下一个 handler 来处理？比如我们熟悉的 JavaEE 中的 Filter 是采用在一个 Filter 实例中调用 chain.doFilter(request, response) 来传递给下一个 Filter 这种方式的。
+
+我们用下面这张图结束本节。下图展示了传播的方法，但我其实是更想让大家看一下，哪些事件是 Inbound 类型的，哪些是 Outbound 类型的：
+![](https://www.javadoop.com/blogimages/netty-source/19.png)
+
+Outbound 类型的几个事件大家应该比较好认，注意 bind 也是 Outbound 类型的。
