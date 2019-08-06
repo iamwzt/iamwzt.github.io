@@ -69,6 +69,7 @@ final Node<K,V> getNode(int hash, Object key) {
 HashMap 的hash实现：
 - key 为null，则为0，因此都在数组第一个位置；
 - 高低16位异或，称为hash扰动，低16位保留高16位的信息，减少冲突
+
 ```java
 static final int hash(Object key) {
     int h;
