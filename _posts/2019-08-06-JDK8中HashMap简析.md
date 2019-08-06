@@ -1,5 +1,15 @@
+---
+layout:     post
+title:      JDK8中 HashMap 源码简析
+date:       2019-08-06
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - HashMap
+---
 
-### 基本属性
+### 几个常量值
 ```java
 // 默认初始容量
 static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
@@ -22,7 +32,7 @@ static final int MIN_TREEIFY_CAPACITY = 64;
 ```
 ---
 
-### get()
+### get方法
 ```java
 public V get(Object key) {
     Node<K,V> e;
@@ -67,7 +77,7 @@ static final int hash(Object key) {
 ```
 ---
 
-### put()
+### put方法
 ```java
 public V put(K key, V value) {
     return putVal(hash(key), key, value, false, true);
@@ -165,9 +175,11 @@ final void treeifyBin(Node<K,V>[] tab, int hash) {
 }
 ```
 流程图如下：
-!(put流程)[https://wzt-img.oss-cn-chengdu.aliyuncs.com/HashMap-putVal.png]
+![put流程图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/HashMap-putVal.png)
 
-### resize()
+---
+
+### resize方法
 ```java
 final Node<K,V>[] resize() {
     Node<K,V>[] oldTab = table;
