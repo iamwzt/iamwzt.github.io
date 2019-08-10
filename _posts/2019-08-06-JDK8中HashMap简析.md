@@ -9,6 +9,8 @@ tags:
     - HashMap
 ---
 
+本文主要介绍JDK8中的HashMap中的get()、put()和resize()方法。
+
 ### 几个常量值
 ```java
 // 默认初始容量
