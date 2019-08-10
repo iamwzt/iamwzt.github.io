@@ -228,6 +228,7 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
             }
         }
     }
+    // 这里会将binCount+1，若需要，就扩容
     addCount(1L, binCount);
     return null;
 }
