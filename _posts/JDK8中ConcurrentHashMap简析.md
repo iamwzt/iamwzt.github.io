@@ -1,3 +1,15 @@
+---
+layout:     post
+title:      JDK8中ConcurrentHashMap简析
+date:       2019-08-10
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - ConcurrentHashMap
+---
+
+本文主要介绍JDK8中ConcurrentHashMap的get()、put()方法，其中put()方法涉及到扩容，较为复杂，需要用心看下。
 
 ### 几个常量值
 相对HashMap，ConcurrentHashMap 多了很多常量，这里先罗列一些，混个眼熟，后面用到的再细讲。
@@ -326,6 +338,7 @@ private final void tryPresize(int size) {
                     transfer(tab, nt);
             }
             // 1、会先进这个分支，此时nextTab为null
+            // 这里将 SIZECTL 设置为 (rs << RESIZE_STAMP_SHIFT) + 2
             else if (U.compareAndSwapInt(this, SIZECTL, sc,
                                          (rs << RESIZE_STAMP_SHIFT) + 2))
                 transfer(tab, null);
@@ -403,30 +416,45 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
         }
         if (i < 0 || i >= n || i + n >= nextn) {
             int sc;
+            // 所有的迁移操作已经完成
             if (finishing) {
                 nextTable = null;
                 table = nextTab;
+                // 重新计算 sizeCtl：n 是原数组长度，所以 sizeCtl 得出的值将是新数组长度的 0.75 倍
                 sizeCtl = (n << 1) - (n >>> 1);
                 return;
             }
+            // 之前在tryPresize()方法中说过，sizeCtl 在迁移前会设置为 (rs << RESIZE_STAMP_SHIFT) + 2
+            // 然后，每有一个线程参与迁移就会将 sizeCtl 加 1（下面的helpTransfer()方法），
+            // 这里使用 CAS 操作对 sizeCtl 进行减 1，代表做完了属于自己的任务
             if (U.compareAndSwapInt(this, SIZECTL, sc = sizeCtl, sc - 1)) {
+                // 任务结束，方法退出
                 if ((sc - 2) != resizeStamp(n) << RESIZE_STAMP_SHIFT)
                     return;
+                // 所有的迁移任务都做完了，下个循环就会进入到上面的 if(finishing){} 分支了
                 finishing = advance = true;
                 i = n; // recheck before commit
             }
         }
+        // 如果位置 i 处是空的，没有任何节点，那么放入刚刚初始化的 ForwardingNode “空节点”
         else if ((f = tabAt(tab, i)) == null)
             advance = casTabAt(tab, i, null, fwd);
+        // 该位置处是一个 ForwardingNode，代表该位置已经迁移过了
         else if ((fh = f.hash) == MOVED)
-            advance = true; // already processed
+            advance = true;
+        // 此处，便是要开始迁移了
         else {
             synchronized (f) {
                 if (tabAt(tab, i) == f) {
                     Node<K,V> ln, hn;
+                    // hash值大于0，则为普通的Node链表的迁移
                     if (fh >= 0) {
+                        // 这个runBit就是为了区分这个链表中的节点应该移到新数组的哪个位置
+                        // 如原数组长度为16（10000），则runBit除了第5位可能为1或0，其它位都为0
                         int runBit = fh & n;
                         Node<K,V> lastRun = f;
+                        // 这个循环是为了从链表里找到一个节点（lastRun）
+                        // 在此之后的所有节点都将在新数组的原下标，或（原下标+原数组长度）
                         for (Node<K,V> p = f.next; p != null; p = p.next) {
                             int b = p.hash & n;
                             if (b != runBit) {
@@ -434,14 +462,17 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                                 lastRun = p;
                             }
                         }
+                        // 为0代表需要在新数组的原下标，放在ln中(low)
                         if (runBit == 0) {
                             ln = lastRun;
                             hn = null;
                         }
+                        // 否则方法hn(high)中
                         else {
                             hn = lastRun;
                             ln = null;
                         }
+                        // 处理链表中lastRun之前的节点
                         for (Node<K,V> p = f; p != lastRun; p = p.next) {
                             int ph = p.hash; K pk = p.key; V pv = p.val;
                             if ((ph & n) == 0)
@@ -449,11 +480,15 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                             else
                                 hn = new Node<K,V>(ph, pk, pv, hn);
                         }
+                        // 将low和high两个链表分别放在新数组的指定下标下
                         setTabAt(nextTab, i, ln);
                         setTabAt(nextTab, i + n, hn);
+                        // 设置原数组的该下标位置为ForwardingNode，Hash值为MOVED（-1），代表已迁移
                         setTabAt(tab, i, fwd);
+                        // advance 设置为 true，代表该位置已经迁移完毕
                         advance = true;
                     }
+                    // 红黑树的迁移
                     else if (f instanceof TreeBin) {
                         TreeBin<K,V> t = (TreeBin<K,V>)f;
                         TreeNode<K,V> lo = null, loTail = null;
@@ -480,6 +515,7 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
                                 ++hc;
                             }
                         }
+                        // 如果一分为二后，节点数少于 8，那么将红黑树转换回链表
                         ln = (lc <= UNTREEIFY_THRESHOLD) ? untreeify(lo) :
                             (hc != 0) ? new TreeBin<K,V>(lo) : t;
                         hn = (hc <= UNTREEIFY_THRESHOLD) ? untreeify(hi) :
@@ -511,6 +547,7 @@ final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
             if ((sc >>> RESIZE_STAMP_SHIFT) != rs || sc == rs + 1 ||
                 sc == rs + MAX_RESIZERS || transferIndex <= 0)
                 break;
+            // 每多一个线程参与迁移，SIZECTL 就 CAS 加1
             if (U.compareAndSwapInt(this, SIZECTL, sc, sc + 1)) {
                 transfer(tab, nextTab);
                 break;
@@ -521,3 +558,6 @@ final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
     return table;
 }
 ```
+
+最后放一张put的简易流程图：
+![put流程图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/ConcurrentHashMap-putVal.png)
