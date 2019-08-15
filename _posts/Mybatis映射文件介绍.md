@@ -10,7 +10,7 @@ insert, update, delete三个标签的属性和使用方法相似，这里就以i
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
 <!-- namespace 的值对应一个DAO -->
-<mapper namespace="com.wzt.batis.UserMapper">
+<mapper namespace="com.wzt.batis.dao.UserMapper">
             <!-- 1. id 对应DAO中的一个方法 -->
     <insert id="insert"
             <!-- 2. parameterType 将要传入语句的参数的完全限定类名或别名
@@ -35,7 +35,7 @@ insert, update, delete三个标签的属性和使用方法相似，这里就以i
 代码见真章：
 #### 数据库表
 ```sql
-CREATE TABLE `demoTable` (
+CREATE TABLE IF NOT EXISTS `tb_user` (
   `id` INT COLLATE utf8_bin NOT NULL AUTO_INCREMENT COMMENT '编号',
   `name` VARCHAR (36) COLLATE utf8_bin NOT NULL COMMENT '姓名',
   `age` INT NOT NULL COMMENT '年龄',
@@ -64,9 +64,9 @@ public interface UserMapper {
 ```xml
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
-<mapper namespace="com.wzt.batis.UserMapper">
+<mapper namespace="com.wzt.batis.dao.UserMapper">
     <insert id="insert" parameterType="user">
-        INSERT INTO demoTable (id,name,age,gender)VALUES (
+        INSERT INTO tb_user (id,name,age,gender)VALUES (
           #{id},#{name},#{age},#{gender}
         )
     </insert>
@@ -98,14 +98,14 @@ public class TestMain {
     }
 }
 ```
-执行后数据库的 demoTable 表中多了一条数据。
+执行后数据库的 tb_user 表中多了一条数据。
 
 `userMapper.insert(user)`成功执行返回1（失败则为0）。
 
 如果插入时不指定id，采用数据库的自增主键，并想要得到记录的id值，可以这样修改：
 ```xml
 <insert id="insert" parameterType="user" useGeneratedKeys="true" keyProperty="id">
-    INSERT INTO demoTable (name,age,gender)VALUES (
+    INSERT INTO tb_user (name,age,gender)VALUES (
       #{name},#{age},#{gender}
     )
 </insert>
@@ -116,7 +116,7 @@ public class TestMain {
     <selectKey keyProperty="id" resultType="int" order="AFTER" >
         SELECT LAST_INSERT_ID()
     </selectKey>
-    INSERT INTO demoTable (name,age,gender)VALUES (
+    INSERT INTO tb_user (name,age,gender)VALUES (
       #{name},#{age},#{gender}
     )
 </insert>
@@ -138,7 +138,7 @@ public class TestMain {
         SELECT UUID()
     </selectKey>
     <!-- 这里也加上了id列 -->
-    INSERT INTO demoTable (id, name, age, gender)VALUES (
+    INSERT INTO tb_user (id, name, age, gender)VALUES (
       #{id}, #{name}, #{age}, #{gender}
     )
 </insert>
@@ -148,3 +148,158 @@ public class TestMain {
 不过在网上看到这里有个隐患，就是通过mybatis生成的UUID可能存在重复，emmm，所以实际工程中还是用java的UUID，更加方便，还不重复！
 
 ### 重头戏 select
+先来看看mapper映射文件中，select 标签可以有哪些属性：
+```xml
+<!-- 大多属性和insert相似，下面列几个多出来的 -->
+<select id="select"
+        <!-- 下面两个二选一，用来指定返回的类型 -->
+        resultType="user" resultMap="uuu"
+        <!-- 尝试影响驱动程序每次批量返回的结果行数和这个设置值相等 -->
+        fetchSize="10"
+        <!-- 设置本条语句的结果是否被二级缓存，默认为true -->
+        useCache="true" />
+```
+要更全的可以查看相应的官方文档。
+
+现在来看看select的demo。以上面的tb_user表为例，查询某个id的user记录的select为：
+```xml
+<select id="findUserById" parameterType="string" resultType="user">
+    SELECT * FROM tb_user WHERE `id` = #{userId}
+</select>
+```
+DAO层接口为：
+```java
+@Mapper
+public interface UserMapper {
+    UserDo findUserById(String userId);
+}   
+```
+可以看到select语句中的`#{userId}`来自接口方法的入参，返回类型`resultType`为user（这是个别名）。
+
+**这里有个注意点：** 入参只有一个时，可以直接这么取；若是有多个，则需要加注解 `@Param()`了，比如要根据性别和年龄来查：
+```java
+@Mapper
+public interface UserMapper {
+    UserDo findUserByGenderAndAge(@Param("gender") String gender, 
+                                  @Param("age") String age);
+}   
+```
+```xml
+<select id="findUserByGenderAndAge" parameterType="string" resultType="user">
+    SELECT * FROM tb_user 
+    WHERE `gender` = #{gender} AND `age` = #{age}
+</select>
+```
+
+在上面介绍select的属性时提到，返回类型可以用两个属性来指定，`resultType` 和 `resultMap`，上面的demo用到了`resultType`，下面讲讲`resultMap`的用法。
+
+**resultMap** 最简单的用法就是字段的映射。
+若数据库中字段和用来接收的Javabean的属性一致时，用resultType即可，但若是不一致，resultMap就派上用场了。
+比如说数据库中的字段是uuid，Javabean中是id，此时需要这样配置：
+```xml
+<resultMap id="userMap" type="user">
+    <result property="id" column="uuid"/>
+</resultMap>
+```
+这样就完成了一个简单地字段映射。不过resultMap的强大之处远不止此。
+
+在上面的demo中，返回接收的user的属性都是简单的基本类型的包装类型和String，但如果是个自定义的类，resultMap也可以处理得很好：
+
+现在我们给User类中增加一个Role属性
+```java
+public class UserDo {
+    // ...
+    private RoleDo role;
+}
+```
+在数据库中增加两张表，分别是角色表**tb_role**，和用户角色关联表**tb_user_role_relation**：
+```sql
+-- 角色表
+CREATE TABLE
+IF NOT EXISTS tb_role (
+	`id` INT NOT NULL AUTO_INCREMENT COMMENT '编号',
+	`name` VARCHAR (20) NOT NULL COMMENT '角色名',
+	PRIMARY KEY (`id`)
+) ENGINE = INNODB DEFAULT CHARSET = utf8 COLLATE = utf8_bin;
+-- 用户角色关系表
+CREATE TABLE
+IF NOT EXISTS tb_user_role_relation (
+	`id` INT NOT NULL AUTO_INCREMENT COMMENT '编号',
+	`user_id` VARCHAR (20) NOT NULL COMMENT '用户id',
+	`role_id` VARCHAR (20) NOT NULL COMMENT '角色id',
+	PRIMARY KEY (`id`)
+) ENGINE = INNODB DEFAULT CHARSET = utf8 COLLATE = utf8_bin;
+```
+在mapper映射文件中，可以用 `<association/>` 进行关联：
+```xml
+<select id="select" resultMap="userMap" >
+     SELECT u.*, r.`id` AS role_id, r.`name` AS role_name FROM tb_user u
+     LEFT JOIN tb_user_role_relation urr ON u.id = urr.user_id
+     LEFT JOIN tb_role r ON urr.role_id = r.id
+</select>
+<resultMap id="userMap" type="user">
+    <id property="id" column="id"/>
+    <result property="age" column="age"/>
+    <result property="gender" column="gender"/>
+    <result property="name" column="name"/>
+    <association property="role" javaType="role">
+        <id property="id" column="role_id"/>
+        <result property="name" column="role_name"/>
+    </association>
+</resultMap>
+```
+便可将role和user关联起来：
+```json
+{
+    "id": "49",
+    "name": "ZhangSan",
+    "age": 25,
+    "gender": "male",
+    "role": {
+        "id": 2,
+        "name": "manager"
+    }
+}
+```
+
+在上面这个例子中，一个user只有一个role，但实际上一个user可能对应着多个role，在Javabean中的表现就是：
+```java
+public class UserDo {
+    // ...
+    private List<RoleDo> roles;
+}
+```
+此时可以用 `<collection/>` 进行关联：
+```xml
+<resultMap id="userMap" type="user">
+    <id property="id" column="id"/>
+    <result property="age" column="age"/>
+    <result property="gender" column="gender"/>
+    <result property="name" column="name"/>
+    <collection property="roles" ofType="role">
+        <id property="id" column="role_id"/>
+        <result property="name" column="role_name"/>
+    </collection>
+</resultMap>
+```
+可以得到结果：
+```json
+{
+    "id": "49",
+    "name": "ZhangSan",
+    "age": 25,
+    "gender": "male",
+    "roles": [
+        {
+            "id": 1,
+            "name": "admin"
+        },
+        {
+            "id": 2,
+            "name": "manager"
+        }
+    ]
+}
+```
+
+到此，mapper映射文件介绍告一段落。
