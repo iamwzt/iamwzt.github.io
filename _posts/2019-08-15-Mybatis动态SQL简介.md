@@ -92,5 +92,26 @@ Mybatis的动态SQL解决了这一痛点，通过几个标签便可灵活地组�
 ```java
 List<UserDo> selectUserIn(List<String> ids);
 ```
+其中 collection 属性可选的值是：
+- List 为 list；
+- 数组为 array；
+- 可用@Param 注解自定义变量名。
 
+若为数组或List，则index为其索引；若为Map，则为key。
 
+### 多重选择 choose
+类似java的switch，动态SQL `<choose/>` 可以实现多重选择：
+```xml
+<select id="findUserByAgeANDGender" resultType="user">
+    SELECT * FROM tb_user
+    <where>
+        <choose>
+            <when test="age != null"> AND `age` = #{age} </when>
+            <when test="gender != null"> AND `gender` = #{gender} </when>
+            <otherwise> `age` > 0 AND `gender` in ('male', "female") </otherwise>
+        </choose>
+    </where>
+</select>
+```
+
+--END--
