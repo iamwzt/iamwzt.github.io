@@ -6,7 +6,7 @@ author:     iamwzt
 header-img: img/home-bg-o.jpg
 catalog: true
 tags:
-    - MyBatis
+    - Mybatis
 ---
 使用传统的JDBC方法时，拼接SQL语句是个头疼的事，一不留神就少个空格多个逗号出错了。
 Mybatis的动态SQL解决了这一痛点，通过几个标签便可灵活地组成SQL语句了。
