@@ -1,3 +1,15 @@
+---
+layout:     post
+title:      SpringCloud学习之路（1） Eureka初体验
+date:       2019-08-22
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - SpringCloud
+    - Eureka
+---
+
 本系列文章用于记录SpringCloud的学习历程，计划会先过一遍各个组件的基本使用，写一个小Demo，然后再去看一下核心的源码。废话不多说，开始。
 
 ### Eureka简介
