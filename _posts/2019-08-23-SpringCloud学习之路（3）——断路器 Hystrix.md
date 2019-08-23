@@ -10,6 +10,8 @@ tags:
     - Hystrix
 ---
 
+本系列文章用于记录SpringCloud的学习历程，计划会先简单地过一遍各个组件，分别写个小Demo，混个眼熟；然后再去看一下源码，理解原理。
+
 本系列文章导航：
 - [SpringCloud学习之路（1）——注册中心 Eureka](https://iamwzt.github.io/2019/08/22/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-1-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83-Eureka/)
 - [SpringCloud学习之路（2）——负载均衡 Ribbon](https://iamwzt.github.io/2019/08/23/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-2-%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1-Ribbon/)
@@ -43,6 +45,8 @@ tags:
 
 更多介绍参考[Hystrix-wiki](https://github.com/Netflix/Hystrix/wiki)
 
+---
+
 ## 前期准备
 本系列文章所使用的软件版本如下：
 1. SpringBoot (2.1.3.RELEASE)
@@ -68,6 +72,8 @@ tags:
     </dependencies>
 </dependencyManagement>
 ```
+
+---
 
 ## 使用Hystrix
 Hystrix是在服务调用者上生效的，所以首先需要引入**依赖**，现在Invoker的全部依赖如下所示：
