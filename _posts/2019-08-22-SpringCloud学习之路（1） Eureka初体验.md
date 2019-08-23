@@ -12,7 +12,7 @@ tags:
 
 本系列文章用于记录SpringCloud的学习历程，计划会先过一遍各个组件的基本使用，写一个小Demo，然后再去看一下核心的源码。废话不多说，开始。
 
-### Eureka简介
+## Eureka简介
 
 > Eureka是Netflix开发的服务发现框架，本身是一个基于REST的服务，主要用于定位运行在AWS域中的中间层服务，以达到负载均衡和中间层服务故障转移的目的。SpringCloud将它集成在其子项目spring-cloud-netflix中，以实现SpringCloud的服务发现功能。
 >
@@ -28,7 +28,7 @@ tags:
 
 以上内容来自百度百科。
 
-### 前期准备
+## 前期准备
 本系列文章所使用的软件版本如下：
 1. SpringBoot (2.1.3.RELEASE)
 2. SpringCloud (Finchley.RELEASE)
@@ -54,7 +54,7 @@ tags:
 </dependencyManagement>
 ```
 
-### Eureka 服务端
+## Eureka 服务端
 Eureka 服务端需要引入的**依赖**有：
 ```xml
 <!-- Eureka server 中已经包含了 starter-web -->
@@ -90,10 +90,10 @@ public class EurekaServerApplication {
 
 OK，到这里一个简单的Eureka服务端便已完成，可在浏览器输入 `http://localhost:8761` 查看控制台。
 
-### Eureka 客户端
+## Eureka 客户端
 Eureka 客户端可以简单地分成两类：服务提供者和调用者；当然服务提供者同时可能是另一个服务的调用者，反之亦然。
 
-#### 服务提供者
+### 服务提供者
 首先需要引入**依赖**：
 ```xml
 <dependency>
@@ -148,7 +148,7 @@ public class ProviderApplication {
 ```
 `@EnableEurekaClient`注解用于启动服务注册，但实际上这里注释掉也是可以注册成功的，查了下网上的资料，说是有没有无所谓，默认是开启的，主要配置文件中配置了相关的参数即可注册。此处不纠结这点。
 
-#### 服务调用者
+### 服务调用者
 引入**依赖**：
 ```xml
 <dependency>
