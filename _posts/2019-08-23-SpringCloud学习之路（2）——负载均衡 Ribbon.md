@@ -129,4 +129,16 @@ public class InvokerCtl {
     }
 }
 ```
+
+上面讲到，Ribbon默认为我们提供了很多负载均衡算法，例如轮询、随机等。
+而从demo的结果来看，其默认的算法为轮询，如果想要变成其他算法，比如随机，可以修改配置文件：
+```yaml
+# 相应的服务名
+service-provider1:
+  ribbon:
+    # 负载均衡算法
+    NFLoadBalancerRuleClassName: com.netflix.loadbalancer.RandomRule
+```
+重新起服务，可以看到结果变成了随机出现了。
+
 （完）
