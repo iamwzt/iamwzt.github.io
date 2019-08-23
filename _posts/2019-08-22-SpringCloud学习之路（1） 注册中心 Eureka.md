@@ -1,6 +1,6 @@
 ---
 layout:     post
-title:      SpringCloud学习之路（1） Eureka初体验
+title:      SpringCloud学习之路（1） 注册中心 Eureka
 date:       2019-08-22
 author:     iamwzt
 header-img: img/home-bg-o.jpg
