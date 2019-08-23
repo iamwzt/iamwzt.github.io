@@ -12,6 +12,10 @@ tags:
 
 本系列文章导航：
 - [SpringCloud学习之路（1）——注册中心 Eureka](https://iamwzt.github.io/2019/08/22/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-1-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83-Eureka/)
+- **SpringCloud学习之路（2）——负载均衡 Ribbon**
+- [SpringCloud学习之路（3）——断路器 Hystrix](https://iamwzt.github.io/2019/08/23/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-3-%E6%96%AD%E8%B7%AF%E5%99%A8-Hystrix/)
+
+---
 
 ## Ribbon简介
 Ribbon是Netflix发布的负载均衡器，它有助于控制HTTP和TCP的客户端的行为。
