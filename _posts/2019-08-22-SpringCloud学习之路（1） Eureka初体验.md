@@ -28,6 +28,8 @@ tags:
 
 以上内容来自百度百科。
 
+---
+
 ## 前期准备
 本系列文章所使用的软件版本如下：
 1. SpringBoot (2.1.3.RELEASE)
@@ -53,6 +55,8 @@ tags:
     </dependencies>
 </dependencyManagement>
 ```
+
+---
 
 ## Eureka 服务端
 Eureka 服务端需要引入的**依赖**有：
@@ -89,6 +93,8 @@ public class EurekaServerApplication {
 比较简单，在SpringBoot的基础上增加一个`@EnableEurekaServer`的注解。
 
 OK，到这里一个简单的Eureka服务端便已完成，可在浏览器输入 `http://localhost:8761` 查看控制台。
+
+---
 
 ## Eureka 客户端
 Eureka 客户端可以简单地分成两类：服务提供者和调用者；当然服务提供者同时可能是另一个服务的调用者，反之亦然。
