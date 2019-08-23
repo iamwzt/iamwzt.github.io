@@ -10,6 +10,8 @@ tags:
     - Ribbon
 ---
 
+本系列文章用于记录SpringCloud的学习历程，计划会先简单地过一遍各个组件，分别写个小Demo，混个眼熟；然后再去看一下源码，理解原理。
+
 本系列文章导航：
 - [SpringCloud学习之路（1）——注册中心 Eureka](https://iamwzt.github.io/2019/08/22/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-1-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83-Eureka/)
 - **SpringCloud学习之路（2）——负载均衡 Ribbon**
@@ -22,6 +24,8 @@ Ribbon是Netflix发布的负载均衡器，它有助于控制HTTP和TCP的客户
 为Ribbon配置服务提供者地址后，Ribbon就可基于**某种负载均衡算法**，自动地帮助服务消费者去请求。
 Ribbon默认为我们提供了很多负载均衡算法，例如轮询、随机等。当然，我们也可为Ribbon实现自定义的负载均衡算法。
 在Spring Cloud中，当Ribbon与Eureka配合使用时，Ribbon可自动从Eureka Server获取服务提供者地址列表，并基于负载均衡算法，请求其中一个服务提供者实例。
+
+---
 
 ## 前期准备
 本系列文章所使用的软件版本如下：
@@ -78,6 +82,8 @@ public class ProviderCtl {
 }
 ```
 改造完成！
+
+---
 
 ## 服务调用者
 负载均衡是在服务调用者这边实现的，在[SpringCloud学习之路（1）——注册中心 Eureka](https://iamwzt.github.io/2019/08/22/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-1-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83-Eureka/)中其实已经实现，这里再作一下说明。
