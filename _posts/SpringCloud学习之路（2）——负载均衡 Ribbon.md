@@ -1,5 +1,17 @@
+---
+layout:     post
+title:      SpringCloud学习之路（2）——负载均衡 Ribbon
+date:       2019-08-23
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - SpringCloud
+    - Ribbon
+---
+
 本系列文章导航：
-- [SpringCloud学习之路（1）——注册中心 Eureka]()
+- [SpringCloud学习之路（1）——注册中心 Eureka](https://iamwzt.github.io/2019/08/22/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-1-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83-Eureka/)
 
 ## Ribbon简介
 Ribbon是Netflix发布的负载均衡器，它有助于控制HTTP和TCP的客户端的行为。
@@ -38,7 +50,7 @@ Ribbon默认为我们提供了很多负载均衡算法，例如轮询、随机�
 2. 多个服务提供者
 3. 一个服务调用者
 
-在 [SpringCloud学习之路（1）——注册中心 Eureka]() 一文中，我们已经有了这些组件了，具体可以去再过一遍，这里需要做的改造只有将一个服务提供者扩充为多个。
+在 [SpringCloud学习之路（1）——注册中心 Eureka](https://iamwzt.github.io/2019/08/22/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-1-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83-Eureka/) 一文中，我们已经有了这些组件了，具体可以去再过一遍，这里需要做的改造只有将一个服务提供者扩充为多个。
 
 ---
 
@@ -64,7 +76,7 @@ public class ProviderCtl {
 改造完成！
 
 ## 服务调用者
-负载均衡是在服务调用者这边实现的，在[SpringCloud学习之路（1）——注册中心 Eureka]()中其实已经实现，这里再作一下说明。
+负载均衡是在服务调用者这边实现的，在[SpringCloud学习之路（1）——注册中心 Eureka](https://iamwzt.github.io/2019/08/22/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-1-%E6%B3%A8%E5%86%8C%E4%B8%AD%E5%BF%83-Eureka/)中其实已经实现，这里再作一下说明。
 
 在配置 `RestTemplate` 实例的时候，我们引入了一个注解 `@LoadBalanced`，这将会在RestTemplate中加入LoadBalancerInterceptor这个拦截器，
 把 `RestTemplate` 配置成一个具有负载均衡能力的客户端：
@@ -107,4 +119,4 @@ public class InvokerCtl {
     }
 }
 ```
-
+（完）
