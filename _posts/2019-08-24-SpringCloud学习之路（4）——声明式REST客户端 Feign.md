@@ -1,3 +1,15 @@
+---
+layout:     post
+title:      SpringCloud学习之路（4）——声明式REST客户端 Feign
+date:       2019-08-24
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - SpringCloud
+    - Feign
+---
+
 本系列文章用于记录SpringCloud的学习历程，计划会先简单地过一遍各个组件，分别写个小Demo，混个眼熟；然后再去看一下源码，理解原理。
 
 本系列文章导航：
