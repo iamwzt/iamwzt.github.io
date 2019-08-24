@@ -65,7 +65,7 @@ Feign是一个**声明式**的**REST客户端**，它集成了Ribbon，是Spring
 
 ## 使用Feign
 
-1. 首先需要引入Feign的**依赖**：
+首先需要引入Feign的**依赖**：
 ```xml
 <dependency>
     <groupId>org.springframework.cloud</groupId>
@@ -73,7 +73,7 @@ Feign是一个**声明式**的**REST客户端**，它集成了Ribbon，是Spring
 </dependency>
 ```
 
-2. 在启动类上加 `@EnableFeignClients` 注解：
+在启动类上加 `@EnableFeignClients` 注解：
 ```java
 //@EnableDiscoveryClient
 @SpringBootApplication
@@ -86,7 +86,7 @@ public class InvokerApplication {
 }
 ```
 
-3. 新建一个接口 `IMyFeignClient`：
+新建一个接口 `IMyFeignClient`：
 ```java
 @FeignClient("service-provider1")
 public interface IMyFeignClient {
@@ -98,7 +98,7 @@ public interface IMyFeignClient {
 - `@FeignClient("service-provider1")`，**声明**该类的方法请求的服务名；
 - `@GetMapping("hello")`，**声明**该方法请求的接口；
 
-4. 然后在Controller里调用：
+然后在Controller里调用：
 ```java
 @RestController
 public class InvokerCtl {
@@ -112,7 +112,7 @@ public class InvokerCtl {
 }
 ```
 
-5. 启动服务，测试 
+启动服务，测试 
 输入`http://loclahost:22001/hello`，可以看到浏览器轮流显示以下内容：
 ```
 hello from Provider, Port: 21001
