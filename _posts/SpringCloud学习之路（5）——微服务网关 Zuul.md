@@ -1,3 +1,15 @@
+---
+layout:     post
+title:      SpringCloud学习之路（5）——微服务网关 Zuul
+date:       2019-08-27
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - SpringCloud
+    - Zuul
+---
+
 本系列文章用于记录SpringCloud的学习历程，计划会先简单地过一遍各个组件，分别写个小Demo，混个眼熟；然后再去看一下源码，理解原理。
 
 本系列文章导航：
