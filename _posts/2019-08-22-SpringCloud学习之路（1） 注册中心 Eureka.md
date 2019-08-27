@@ -17,6 +17,7 @@ tags:
 - [SpringCloud学习之路（2）——负载均衡 Ribbon](https://iamwzt.github.io/2019/08/23/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-2-%E8%B4%9F%E8%BD%BD%E5%9D%87%E8%A1%A1-Ribbon/)
 - [SpringCloud学习之路（3）——断路器 Hystrix](https://iamwzt.github.io/2019/08/23/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-3-%E6%96%AD%E8%B7%AF%E5%99%A8-Hystrix/)
 - [SpringCloud学习之路（4）——声明式REST客户端 Feign](https://iamwzt.github.io/2019/08/24/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-4-%E5%A3%B0%E6%98%8E%E5%BC%8FREST%E5%AE%A2%E6%88%B7%E7%AB%AF-Feign/)
+- [SpringCloud学习之路（5）——微服务网关 Zuul](https://iamwzt.github.io/2019/08/27/SpringCloud%E5%AD%A6%E4%B9%A0%E4%B9%8B%E8%B7%AF-5-%E5%BE%AE%E6%9C%8D%E5%8A%A1%E7%BD%91%E5%85%B3-Zuul/)
 
 ---
 
