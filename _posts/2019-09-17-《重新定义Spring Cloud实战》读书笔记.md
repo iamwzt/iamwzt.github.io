@@ -1,3 +1,16 @@
+---
+layout:     post
+title:      《重新定义Spring Cloud实战》读书笔记
+subtitle:   Eureka篇
+date:       2019-09-17
+author:     iamwzt
+header-img: img/home-bg-o.jpg
+catalog: true
+tags:
+    - SpringCloud
+    - eureka
+---
+
 ## 第二章 Spring Cloud Eureka 上篇
 
 ### 服务发现的由来
