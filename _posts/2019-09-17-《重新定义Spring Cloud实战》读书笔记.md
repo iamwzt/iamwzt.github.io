@@ -8,8 +8,10 @@ header-img: img/home-bg-o.jpg
 catalog: true
 tags:
     - SpringCloud
-    - eureka
+    - Eureka
 ---
+
+Eureka 是由 Netflix 开源的一款基于 REST 的服务发现组件，包括 Eureka Server 和 Eureka Client。
 
 ## 第二章 Spring Cloud Eureka 上篇
 
