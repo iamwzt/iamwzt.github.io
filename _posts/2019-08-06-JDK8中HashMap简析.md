@@ -14,19 +14,19 @@ tags:
 ### 一、几个常量值
 先介绍一下在源码中常见到的几个常量值。
 ```java
-// 默认初始容量
-static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
+// 默认初始容量：就是数组长度默认为16
+static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; 
 
-// 最大容量
+// 最大容量：就是数组最大可达到的长度
 static final int MAXIMUM_CAPACITY = 1 << 30;
 
-// 默认加载因子
+// 默认加载因子：用于计算扩容阈值 threshold
 static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
-// 树化阈值
+// 树化阈值：一个链表中的节点达到该值就转化为红黑树
 static final int TREEIFY_THRESHOLD = 8;
 
-// 去树化阈值
+// 去树化阈值：红黑树中节点个数减少至该值就转化为链表
 static final int UNTREEIFY_THRESHOLD = 6;
 
 // 树化最小容量，≥ 4 × TREEIFY_THRESHOLD
@@ -36,10 +36,10 @@ static final int MIN_TREEIFY_CAPACITY = 64;
 ---
 
 ### 二、构造方法
-HashMap 中一共有四种构造方法，列举如下： 
+HashMap 中一共有4种构造方法，列举如下： 
 
 **注意：**  
-除了第四个以其它map作入参的构造方法外，其余的都**不初始化table数组**！  
+除了第4个以其它map作入参的构造方法外，其余的都**不初始化table数组**！  
 初始化工作是在put第一个元素时完成的。
 ```java
 public HashMap() {
@@ -230,7 +230,7 @@ final void treeifyBin(Node<K,V>[] tab, int hash) {
 2. 数组的指定下标位置不为null，但是头节点就和待插入值就相同
 3. 数组的指定下标位置不为null，头节点也不一样，而且是个红黑树节点
 4. 数组的指定下标位置不为null，头节点也不一样，而且是个正常的链表
-    1. 链表里不存在key相同的，则添加到**链表尾**
+    1. 链表里不存在key相同的，则添加到**链表尾**（JDK7 中是添加到链表头）
     2. 链表内存在相同key，则替换
 
 还有两点需要注意的是：
@@ -264,10 +264,12 @@ final Node<K,V>[] resize() {
     }
     else if (oldThr > 0) // initial capacity was placed in threshold
         newCap = oldThr;
-    else {               // 到这说明还没初始化，就用默认值去设置
+    // 到这说明还没初始化，就用默认值去设置
+    else {
         newCap = DEFAULT_INITIAL_CAPACITY;
         newThr = (int)(DEFAULT_LOAD_FACTOR * DEFAULT_INITIAL_CAPACITY);
     }
+    
     if (newThr == 0) {
         float ft = (float)newCap * loadFactor;
         newThr = (newCap < MAXIMUM_CAPACITY && ft < (float)MAXIMUM_CAPACITY ?
@@ -275,9 +277,9 @@ final Node<K,V>[] resize() {
     }
     threshold = newThr;
     
-    // 到这为止，就是计算扩容后新数组的长度，和新的扩容阈值
+    // 到这为止，就是计算扩容后新数组的长度，以及新的扩容阈值
     
-    // 建一个新数组
+    // 然后开始迁移数据
     Node<K,V>[] newTab = (Node<K,V>[])new Node[newCap];
     table = newTab;
     if (oldTab != null) {
@@ -285,12 +287,13 @@ final Node<K,V>[] resize() {
             Node<K,V> e;
             if ((e = oldTab[j]) != null) {
                 oldTab[j] = null;
-                // 若没有hash冲突形成链表或树，则直接移到新的位置
+                // 情况一：若没有hash冲突形成链表或树，则直接移到新的位置
                 if (e.next == null)
                     newTab[e.hash & (newCap - 1)] = e;
-                // 对于节点是红黑树的处理
+                // 情况二：对于节点是红黑树的处理
                 else if (e instanceof TreeNode)
                     ((TreeNode<K,V>)e).split(this, newTab, j, oldCap);
+                // 情况三：节点是链表的处理
                 else { // preserve order
                     // 这里用两个链去分别保存要留在原下标，和去新下标的Node节点
                     Node<K,V> loHead = null, loTail = null;
@@ -299,7 +302,8 @@ final Node<K,V>[] resize() {
                     
                     do {
                         next = e.next;
-                        // 这里等于0，说明该节点在新数组的位置还是这个原先的下标
+                        // 这里等于0，说明该节点在新数组的位置还是老数组的下标
+                        // 如老数组大小为16，则二进制为 10000，比较第5个位是1或0来判断留原地还是迁移
                         if ((e.hash & oldCap) == 0) {
                             if (loTail == null)
                                 loHead = e;
@@ -315,6 +319,8 @@ final Node<K,V>[] resize() {
                             hiTail = e;
                         }
                     } while ((e = next) != null);
+                    
+                    // 迁移数据
                     if (loTail != null) {
                         loTail.next = null;
                         newTab[j] = loHead;
@@ -339,5 +345,7 @@ final Node<K,V>[] resize() {
 
 由于这个特性，扩容后每个Node链表中，有一部分需要到新的下标位置，一部分还在原来的下标位置。
 
-所以这里用了**lo**和**hi**两个链表，来分别存放这两部分数据。然后一把把这些数据放到新的数组中。
+所以这里用了**lo**和**hi**两个链表，来分别存放这两部分数据。然后一把把这些数据迁移到新的数组中。
+
+--over--
 
