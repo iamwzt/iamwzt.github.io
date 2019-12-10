@@ -13,10 +13,10 @@ tags:
 
 本文主要介绍JDK8中ConcurrentHashMap的get()、put()方法，其中put()方法涉及到扩容，较为复杂，需要用心看下。
 
-### 几个常量值
+### 一、几个常量值
 相对HashMap，ConcurrentHashMap 多了很多常量，这里先罗列一些，混个眼熟，后面用到的再细讲。
 
-这几个和HashMap是一样的
+这几个和HashMap是一样的，不再赘述。
 ```java
 private static final int MAXIMUM_CAPACITY = 1 << 30;
 private static final int DEFAULT_CAPACITY = 16;
@@ -25,35 +25,48 @@ static final int TREEIFY_THRESHOLD = 8;
 static final int UNTREEIFY_THRESHOLD = 6;
 static final int MIN_TREEIFY_CAPACITY = 64;
 ```
-这几个是独有的：
+这几个是 ConcurrentHashMap 独有的：
 ```java
 // 创建map的快照时用
 static final int MAX_ARRAY_SIZE = Integer.MAX_VALUE - 8;
+
 // 这个是老版本的遗留，分16个segment
 private static final int DEFAULT_CONCURRENCY_LEVEL = 16;
+
 // 最小步长，数据迁移时用，可以理解成一个线程最少负责迁移这么多任务吧
 private static final int MIN_TRANSFER_STRIDE = 16;
+
+// 数组初始化或扩容控制字
+// -1 代表在初始化
+// -(1 + 扩容的线程数)
+// 数组为null时，sizeCtl为初始化的数组大小
+// 数组不为null时，sizeCtl为下次扩容时的数组大小
+private transient volatile int sizeCtl;
+
 // 下两个和sizeCtl有关
 private static int RESIZE_STAMP_BITS = 16;
 private static final int RESIZE_STAMP_SHIFT = 32 - RESIZE_STAMP_BITS;
+
 // 最大参与扩容的线程数
 private static final int MAX_RESIZERS = (1 << (32 - RESIZE_STAMP_BITS)) - 1;
-// 几种特殊的hash值，代表不同的节点状态
+
+// 几种特殊的hash值，代表节点的不同状态
 static final int MOVED     = -1; // hash for forwarding nodes
 static final int TREEBIN   = -2; // hash for roots of trees
 static final int RESERVED  = -3; // hash for transient reservations
 static final int HASH_BITS = 0x7fffffff; // usable bits of normal node hash
+
 // 系统的CPU核数
 static final int NCPU = Runtime.getRuntime().availableProcessors();
 ```
 一头雾水？那就对了，先有个眼熟，往下接着看。
 
-### 几个Node内部类
+### 二、几个Node内部类
 ConcurrentHashMap 里有几个Node的子类，分别表示几种不同状态下的节点。如图所示：
 ![这里有图]()
 
 这里的状态就是上面常量中的那几个`MOVED`/`TREEBIN`/`RESERVED`。
-#### Node：普通的节点
+#### 2.1 Node：普通的节点
 Node是常规链表状态下的节点
 ```java
 static class Node<K,V> implements Map.Entry<K,V> {
@@ -64,7 +77,7 @@ static class Node<K,V> implements Map.Entry<K,V> {
     // 省略其它
 }
 ```
-#### TreeNode：红黑树节点
+#### 2.2 TreeNode：红黑树节点
 ```java
 static final class TreeNode<K,V> extends Node<K,V> {
     TreeNode<K,V> parent;  // red-black tree links
@@ -75,7 +88,7 @@ static final class TreeNode<K,V> extends Node<K,V> {
     // 省略其它
 }    
 ```
-#### TreeBin：持有红黑树根节点的一个东东
+#### 2.3 TreeBin：持有红黑树根节点的一个东东
 TreeBin 不保存 key 和 value ，而是持有红黑树的根节点；它的hash值是`TREEBIN`（-2）
 ```java
 static final class TreeBin<K,V> extends Node<K,V> {
@@ -90,7 +103,7 @@ static final class TreeBin<K,V> extends Node<K,V> {
     // 省略其它
 }    
 ```
-#### ForwardingNode：代表数据正在迁移
+#### 2.4 ForwardingNode：代表数据正在迁移
 ForwardingNode 代表正在迁移数据（扩容中），持有扩容后的table表；它的hash值是`MOVED`（-1）
 ```java
 static final class ForwardingNode<K,V> extends Node<K,V> {
@@ -99,7 +112,7 @@ static final class ForwardingNode<K,V> extends Node<K,V> {
 }    
 ```
 
-#### ReservationNode：占位节点
+#### 2.5 ReservationNode：占位节点
 computeIfAbsent 和 compute 方法中用到的占位节点，hash值为`RESERVED`（-2）
 ```java
 static final class ReservationNode<K,V> extends Node<K,V> {
@@ -112,24 +125,30 @@ static final class ReservationNode<K,V> extends Node<K,V> {
     }
 }
 ```
+仍然是眼熟阶段，继续向下。
+
 ---
 
-### get方法
+### 三、get方法
 ```java
 public V get(Object key) {
     Node<K,V>[] tab; Node<K,V> e, p; int n, eh; K ek;
+    // hash值计算
     int h = spread(key.hashCode());
     if ((tab = table) != null && (n = tab.length) > 0 &&
         // 这里是通过Unsafe类的方法来获取指定下标的节点
         (e = tabAt(tab, (n - 1) & h)) != null) {
+        // 头节点即所需节点
         if ((eh = e.hash) == h) {
             if ((ek = e.key) == key || (ek != null && key.equals(ek)))
                 return e.val;
         }
-        // 正常的链表节点是不会小于0的，只有在扩容、树节点的根节点、反序列化时才会小于0
+        // 正常的链表节点的hash是不会小于0的
+        // 只有在扩容、树节点的根节点、反序列化时才会小于0
         else if (eh < 0)
             // 在上述的三种情况下，find方法也各有实现
             return (p = e.find(h, key)) != null ? p.val : null;
+            
         // 这里是普通的链表搜索了
         while ((e = e.next) != null) {
             if (e.hash == h &&
@@ -140,7 +159,7 @@ public V get(Object key) {
     return null;
 }
 ```
-#### spread()
+`spread()`是 ConcurrentHashMap 中的hash计算方法
 - 和HashMap一样的是：同样需要高低位扰动（spread）；
 - 不一样的是：1、没有对key为null的处理；2、和HASH_BITS与后确保符号位为0；
 
@@ -151,38 +170,44 @@ static final int spread(int h) {
 ```
 ---
 
-### put方法
+### 四、put方法
 ```java
 public V put(K key, V value) {
     return putVal(key, value, false);
 }
 ```
 
-### putVal方法
+### 4.1 putVal方法
 ```java
 final V putVal(K key, V value, boolean onlyIfAbsent) {
-    // 不同于HashMap，不接收key或value为null的节点
+    // 不同于 HashMap，不接收 key 或 value 为 null 的节点
     if (key == null || value == null) throw new NullPointerException();
     int hash = spread(key.hashCode());
     int binCount = 0;
+    
+    // 自旋
     for (Node<K,V>[] tab = table;;) {
         Node<K,V> f; int n, i, fh;
+        
+        // 情况一：表还是空的，先初始化，下个循环再继续
         if (tab == null || (n = tab.length) == 0)
-            // 初始化table表
             tab = initTable();
+            
+        // 情况二：指定下标没有节点时，则不加锁，直接CAS插入
         else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
-            // 指定下标没有节点时，则不加锁，直接CAS插入
             if (casTabAt(tab, i, null,
                          new Node<K,V>(hash, key, value, null)))
-                break;                   // no lock when adding to empty bin
+                break; 
         }
-        // 指定下标的节点hash为MOVED时，说明正在扩容，就帮忙扩容
+        
+        // 情况三：指定下标的节点hash为MOVED时，说明正在扩容，就帮忙扩容
         else if ((fh = f.hash) == MOVED)
             tab = helpTransfer(tab, f);
-        // 正常情况下，就来到这个分支了
+            
+        // 情况四：正常情况下，就来到这个分支了
         else {
             V oldVal = null;
-            // 先加个锁
+            // 这里就需要加锁了
             synchronized (f) {
                 if (tabAt(tab, i) == f) {
                     if (fh >= 0) {
@@ -235,9 +260,19 @@ final V putVal(K key, V value, boolean onlyIfAbsent) {
     return null;
 }
 ```
+可以看到，put时有4种情况：
+1. 数组还为null，需要初始化；
+2. 数组指定下标值为null，则CAS插入；
+3. 数组指定下标的节点正在迁移，则帮忙数据迁移；
+4. 正常的插入值。
 
-#### initTable()
-插入第一个节点时，需要初始化table数组
+整个过程是自旋的，不成功插入不退出。
+
+先来看看初始化数组的方法。
+#### 4.2 initTable()
+插入第一个节点时，需要初始化table数组。
+
+比较简单，有别的线程在初始化就等一会，不然就自己开干。
 ```java
 private final Node<K,V>[] initTable() {
     Node<K,V>[] tab; int sc;
@@ -267,7 +302,8 @@ private final Node<K,V>[] initTable() {
 }
 ```
 
-#### treeifyBin()
+#### 4.3 treeifyBin()
+树化的方法。
 ```java
 private final void treeifyBin(Node<K,V>[] tab, int index) {
     Node<K,V> b; int n, sc;
@@ -296,7 +332,10 @@ private final void treeifyBin(Node<K,V>[] tab, int index) {
     }
 }
 ```
-#### tryPresize()
+
+**高能预警！！！**下面两个方法（扩容和数据迁移）是JDK8 ConcurrentHashMap的难点所在。
+
+#### 4.4 tryPresize()
 有两个地方会调用这个方法：
 1. putAll()方法，被put的数量不定；
 2. treeifyBin()，此时是扩容，size必是2的指数
@@ -328,6 +367,8 @@ private final void tryPresize(int size) {
         }
         else if (c <= sc || n >= MAXIMUM_CAPACITY)
             break;
+        
+        // 数据迁移
         else if (tab == table) {
             int rs = resizeStamp(n);
             // 2、后续进到这个分支，nextTab为新建的数组nt
@@ -350,7 +391,7 @@ private final void tryPresize(int size) {
 }
 ```
 
-#### transfer()
+#### 4.5 transfer()
 ```java
 private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
     int n = tab.length, stride;
@@ -380,7 +421,7 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
     }
     int nextn = nextTab.length;
     
-    // ForwardingNode 翻译过来就是正在被迁移的 Node
+    // ForwardingNode 翻译过来就是 “正在被迁移的 Node”
     // 这个构造方法会生成一个Node，key、value 和 next 都为 null，关键是 hash 为 MOVED
     // 后面我们会看到，原数组中位置 i 处的节点完成迁移工作后，
     //    就会将位置 i 处设置为这个 ForwardingNode，用来告诉其他线程该位置已经处理过了
@@ -535,7 +576,7 @@ private final void transfer(Node<K,V>[] tab, Node<K,V>[] nextTab) {
 }
 ```
 
-#### helpTransfer()
+#### 4.6 helpTransfer()
 ```java
 final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
     Node<K,V>[] nextTab; int sc;
@@ -564,3 +605,5 @@ final Node<K,V>[] helpTransfer(Node<K,V>[] tab, Node<K,V> f) {
 
 最后放一张put的简易流程图：
 ![put流程图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/ConcurrentHashMap-putVal.png)
+
+-- over --
