@@ -11,7 +11,8 @@ tags:
 
 本文主要介绍JDK8中的HashMap中的get()、put()和resize()方法。
 
-### 几个常量值
+### 一、几个常量值
+先介绍一下在源码中常见到的几个常量值。
 ```java
 // 默认初始容量
 static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
@@ -34,7 +35,9 @@ static final int MIN_TREEIFY_CAPACITY = 64;
 ```
 ---
 
-### 构造方法
+### 二、构造方法
+HashMap 中一共有四种构造方法，列举如下： 
+
 **注意：**  
 除了第四个以其它map作入参的构造方法外，其余的都**不初始化table数组**！  
 初始化工作是在put第一个元素时完成的。
@@ -70,7 +73,7 @@ public HashMap(Map<? extends K, ? extends V> m) {
 
 ---
 
-### get方法
+### 三、get方法
 ```java
 public V get(Object key) {
     Node<K,V> e;
@@ -78,18 +81,21 @@ public V get(Object key) {
 }
 ```
 
-#### getNode()
+#### 3.1 getNode()
 ```java
 final Node<K,V> getNode(int hash, Object key) {
     Node<K,V>[] tab; Node<K,V> first, e; int n; K k;
+    
     // table 里头有元素， 并且相应下标位置不为 null 
     if ((tab = table) != null && (n = tab.length) > 0 &&
         (first = tab[(n - 1) & hash]) != null) {
+        
         // 看头节点是不是咯，不是再往下找
         if (first.hash == hash && 
             ((k = first.key) == key || (key != null && key.equals(k))))
             return first;
         if ((e = first.next) != null) {
+        
             // 红黑树的查找
             if (first instanceof TreeNode)
                 return ((TreeNode<K,V>)first).getTreeNode(hash, key);
@@ -103,9 +109,10 @@ final Node<K,V> getNode(int hash, Object key) {
     return null;
 }
 ```
-#### hash()
-HashMap 的hash实现：
-- key 为null，则为0，因此都在数组第一个位置；
+
+#### 3.2 hash()
+这里顺带一提 jdk8 中 HashMap 的 hash()方法实现：
+- key 为null，则为0，因此 `put(null, obj)` 时，都放在数组的第一个位置；
 - 高低16位异或，称为hash扰动，低16位保留高16位的信息，减少冲突
 
 ```java
@@ -116,14 +123,14 @@ static final int hash(Object key) {
 ```
 ---
 
-### put方法
+### 四、put方法
 ```java
 public V put(K key, V value) {
     return putVal(hash(key), key, value, false, true);
 }
 ```
 
-#### putVal()
+#### 4.1 putVal()
 ```java
 final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                boolean evict) {
@@ -133,22 +140,22 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
     if ((tab = table) == null || (n = tab.length) == 0)
         n = (tab = resize()).length;
     
-    // 若对应下标还没有节点，则直接插入
+    // 情况一：若数组对应下标还没有节点，则直接插入
     if ((p = tab[i = (n - 1) & hash]) == null)
         tab[i] = newNode(hash, key, value, null);
     else {
         Node<K,V> e; K k;
         
-        // 这里检查头结点，是否与新增的节点key相同，相同则保存在变量 e 中
+        // 情况二：数组相应下标下有节点，且头结点的key和要put的key一样
         if (p.hash == hash &&
             ((k = p.key) == key || (key != null && key.equals(k))))
             e = p;
         
-        // 若是树节点，则用树的套路
+        // 情况三：若是树节点，则用树的套路
         else if (p instanceof TreeNode)
             e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
         
-        // 正常的链表，则进这个分支
+        // 情况四：是链表则在这里遍历
         else {
             // 遍历列表，这里有两种情况：
             // 1. 若不存在则添到链尾，并判断是否需要树化
@@ -167,7 +174,8 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                 p = e;
             }
         }
-        // e 不为null，说明应该是旧值替换新值
+        
+        // e 不为null，应该新值替换旧值
         if (e != null) { 
             V oldValue = e.value;
             // onlyIfAbsent 为 true时，则只有map中不存在才添加，存在不作改变
@@ -177,8 +185,10 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
             return oldValue;
         }
     }
+    
     // HashMap 结构性的变化次数 +1，为fast-fail服务
     ++modCount;
+    
     // 检查是否需要扩容（插入后再检查）
     if (++size > threshold)
         resize();
@@ -186,8 +196,9 @@ final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
     return null;
 }
 ```
-#### treeifyBin()
-这个方法不细讲，只是提一下树化的另一个条件：
+
+#### 4.2 treeifyBin()
+这个方法不细讲，只是提一下树化的另一个条件（在几个常量中介绍过）：
 `tab.length >= MIN_TREEIFY_CAPACITY`
 ```java
 final void treeifyBin(Node<K,V>[] tab, int hash) {
@@ -213,12 +224,25 @@ final void treeifyBin(Node<K,V>[] tab, int hash) {
     }
 }
 ```
-流程图如下：
+#### 4.3 put 小结
+可以看到put过程中有以下几种情况：
+1. 数组的指定下标位置还为null
+2. 数组的指定下标位置不为null，但是头节点就和待插入值就相同
+3. 数组的指定下标位置不为null，头节点也不一样，而且是个红黑树节点
+4. 数组的指定下标位置不为null，头节点也不一样，而且是个正常的链表
+    1 链表里不存在key相同的，则添加到**链表尾**
+    2 链表内存在相同key，则替换
+
+还有两点需要注意的是：
+1. 先插入，后检查是否需要扩容；
+2. 并不是达到树化阈值就要树化。
+
+put 的流程图如下：
 ![put流程图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/HashMap-putVal.png)
 
 ---
 
-### resize方法
+### 五、resize方法
 ```java
 final Node<K,V>[] resize() {
     Node<K,V>[] oldTab = table;
