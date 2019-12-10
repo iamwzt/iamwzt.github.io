@@ -29,7 +29,7 @@ static final int TREEIFY_THRESHOLD = 8;
 static final int UNTREEIFY_THRESHOLD = 6;
 
 // 树化最小容量，≥ 4 × TREEIFY_THRESHOLD
-// 数组长度小于该值则不树化而是扩容
+// 数组长度小于该值时，某个节点的链表长度超出树化阈值，选择扩容，而非树化
 static final int MIN_TREEIFY_CAPACITY = 64;
 ```
 ---
