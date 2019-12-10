@@ -9,6 +9,8 @@ tags:
     - ConcurrentHashMap
 ---
 
+相关链接：[JDK8中 HashMap 源码简析](https://iamwzt.github.io/2019/08/06/JDK8%E4%B8%ADHashMap%E7%AE%80%E6%9E%90/)
+
 本文主要介绍JDK8中ConcurrentHashMap的get()、put()方法，其中put()方法涉及到扩容，较为复杂，需要用心看下。
 
 ### 几个常量值
