@@ -9,7 +9,7 @@ catalog: true
 tags:
     - ThreadPool
 ---
-### 线程池总览
+### 一、线程池总览
 先看一下线程池的几个“直系”关系：
 
 ![线程池直系关系图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/ThreadPoolExecutor-Simple.png)
@@ -26,8 +26,9 @@ tags:
 - `Future`这边的类，则是用来支持线程执行返回结果的，在线程池中，每个任务都是包装成`FutureTask`给线程执行的；
 - `BlockingQueue`是线程池中的等待队列，其具体作用在下文源码分析中会讲到。
 
-对相关的类有了一些概念后，下面便开始源码之旅。
-### Executor 接口
+对相关的类有了一些概念后，下面便以线程池的几个直系类或接口，开始源码之旅。
+
+### 二、Executor 接口
 ```java
 public interface Executor {
     void execute(Runnable command);
@@ -60,7 +61,7 @@ class DirectExecutor implements Executor {
 总的来说，`Executor`这个接口只能提交任务。如果想要更丰富的功能，如想知道执行结果、管理线程池等，
 就需要继承了这个接口的 `ExecutorService`了。
 
-### ExecutorService 接口
+### 三、ExecutorService 接口
 ```java
 public interface ExecutorService extends Executor {
     // 关闭线程池，不再接受新任务，已提交的任务继续执行
@@ -121,7 +122,7 @@ void shutdownAndAwaitTermination(ExecutorService pool) {
 }
 ```
 
-### AbstractExecutorService 抽象类
+### 四、AbstractExecutorService 抽象类
 AbstractExecutorService 实现了 ExecutorService 中的`submit`/`invokeAll`/`invokeAny`方法。
 
 先来看一下几个`submit`方法：
@@ -198,9 +199,9 @@ static final class RunnableAdapter<T> implements Callable<T> {
 
 // TODO: 几个invoke的方法以后再讲
 
-### ThreadPoolExecutor 类
+### 五、ThreadPoolExecutor 类
 
-#### 构造方法
+#### 5.1 构造方法
 `ThreadPoolExecutor` 是JDK中的线程池实现，可以说是最重要的类了。
 在初学线程池的时候，可能都用过`Executors`的几个静态工厂方法来创建线程池，如：
 ```java
@@ -234,16 +235,16 @@ public ThreadPoolExecutor(int corePoolSize,
 }
 ```
 在这个构造方法中，出现了以下7个参数：
-1. corePoolSize：核心线程数
-2. maximumPoolSize：最大线程数
-3. keepAliveTime：空闲线程存活时间，当线程超过这个时间都没有任务，将会被注销，默认对非核心线程起作用
-4. unit：存活时间的单位
-5. workQueue：任务队列，核心线程都忙时，新提交的线程放在这里
-6. threadFactory：线程工厂，用于生成新线程
-7. handler：拒绝策略，当所有线程都忙，队列也满时，对新提交任务的处理策略
+1. `corePoolSize`：核心线程数
+2. `maximumPoolSize`：最大线程数
+3. `keepAliveTime`：空闲线程存活时间，当线程超过这个时间都没有任务，将会被注销，默认对非核心线程起作用
+4. `unit`：存活时间的单位
+5. `workQueue`：任务队列，核心线程都忙时，新提交的线程放在这里
+6. `threadFactory`：线程工厂，用于生成新线程
+7. `handler`：拒绝策略，当所有线程都忙，队列也满时，对新提交任务的处理策略
 
 除了上述7个参数外，还有几个重要参数，也在这一并罗列：
-#### ctl: 状态 + 线程数
+#### 5.2 ctl: 状态 + 线程数
 `ThreadPoolExecutor`用一个32位数来同时表示线程池的状态及线程数量：
 ```java
 private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
@@ -300,7 +301,7 @@ private static boolean isRunning(int c) {
 
 ![线程池状态图](https://wzt-img.oss-cn-chengdu.aliyuncs.com/ThreadPoolStatus.png)
 
-#### Worker: 工作线程
+#### 5.3 Worker: 工作线程
 在线程池内部，有一个重要的类，其名为 `Worker`，是用来执行任务的线程。
 `Worker`实现了`Runnable`接口，还继承了`AbstractQueuedSynchronized`抽象类。可以看到在JUC包中AQS真是无处不在啊。
 ```java
@@ -330,7 +331,7 @@ private final class Worker extends AbstractQueuedSynchronizer implements Runnabl
     ...
 }
 ```
-#### execute()
+#### 5.4 execute()
 有了上面的铺垫，接下来我们来看一下线程池的核心方法`execute()`。
 ```java
 public void execute(Runnable command) {
@@ -338,8 +339,9 @@ public void execute(Runnable command) {
         throw new NullPointerException();
 
     int c = ctl.get();
-    // 当线程数 < 核心线程数时，就创建一个新的线程（Worker）
-    // 并将当前任务作为firstWork
+    
+    // 情况一：线程数 < 核心线程数
+    // 创建一个新的线程（Worker），并将当前任务作为firstWork
     if (workerCountOf(c) < corePoolSize) {
         // 如果添加成功，就返回了
         // 添加失败说明线程池不允许提交任务了
@@ -347,7 +349,9 @@ public void execute(Runnable command) {
             return;
         c = ctl.get();
     }
-    // 到这说明：1、线程数 > 核心线程数；2、线程池不允许提交线程
+    // 情况二：
+    // 1、线程数 > 核心线程数；
+    // （或）2、线程池不允许提交线程
     
     // 如果线程池处于RUNNING，那就将任务放入任务队列中
     if (isRunning(c) && workQueue.offer(command)) {
@@ -360,7 +364,8 @@ public void execute(Runnable command) {
         else if (workerCountOf(recheck) == 0)
             addWorker(null, false);
     }
-    // 若加入队列失败，说明线程池已经SHUTDOWN，或者队列已经饱和，执行拒绝策略
+    // 情况三：加入队列失败
+    // 说明线程池已经SHUTDOWN，或者队列已经饱和，执行拒绝策略
     else if (!addWorker(command, false))
         reject(command);
 }
@@ -649,7 +654,7 @@ final void tryTerminate() {
 }
 ```
 
-#### 拒绝策略
+#### 5.5 拒绝策略
 
 在`ThreadPoolExecutor`中，已经有默认实现的四种拒绝策略了：
 ```java
@@ -701,7 +706,8 @@ public static class CallerRunsPolicy implements RejectedExecutionHandler {
 - 在执行过程中，T1无法产生新的任务，线程池也可以在此期间减轻负荷量；
 - 若仍有源源不断的新的TCP请求到来，将会阻塞在TCP的缓冲区；
 - 若TCP的缓冲区满，客户端才会收到报错信息
-#### 关闭线程池
+
+#### 5.6 关闭线程池
 ```java
 public void shutdown() {
     final ReentrantLock mainLock = this.mainLock;
@@ -739,4 +745,4 @@ public List<Runnable> shutdownNow() {
     return tasks;
 }
 ```
-完！
+-- over --
