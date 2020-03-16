@@ -194,4 +194,54 @@ func (mux *ServeMux) ServeHTTP(w ResponseWriter, r *Request) {
 1. 按请求方法分类进行路由（GET、POST、PUT、DELETE等）；
 2. 不支持参数设定，例如 `/user/:uid` 这种泛类型匹配
 
-所以就需要自定义路由，后面再讲吧。
+所以就需要自定义路由。
+
+## 自定义路由
+鉴于上面所说的默认路由器的缺点，这边实现一个简单的自定义路由器，来提供**根据请求方法进行路由的功能**
+```go
+type Router struct{
+    // 定义一个两层的 map 用来映射
+    // 方法 - URL - handler
+    m map[string]map[string]http.HandlerFunc
+}
+
+// 实现 http.Handler 接口
+func (r *Router)ServeHTTP(w http.ResponseWriter, req *http.Request){
+    if h, ok := r.m[req.Method][req.URL.String()];ok{
+        h(w, req)
+    }
+}
+
+// 实现一个注册 handler 的方法
+func (r *Router) HandleFunc(method, pattern string, handler http.HandlerFunc){
+    method = strings.ToUpper(method)
+    if r.m == nil {
+        r.m = make(map[string]map[string]http.HandlerFunc)
+    }
+    if r.m[method] == nil {
+        r.m[method] = make(map[string]http.HandlerFunc)
+    }
+    if _, ok := r.m[method][pattern]; ok{
+        panic("重复的路由")
+    }
+    r.m[method][pattern] = handler
+}
+```
+
+跑起来试试：
+```go
+func main() {
+    r := new(Router)
+    r.HandleFunc("GET", "/hello", func(w http.ResponseWriter, req *http.Request) {
+        w.Write([]byte("hello world"))
+    })
+    r.HandleFunc("POST", "/hello", func(w http.ResponseWriter, req *http.Request) {
+        w.Write([]byte("hello world(post)"))
+    })
+    http.ListenAndServe(":8091", r)
+}
+```
+以上就完成了一个简易的自定义路由。
+
+---
+END
