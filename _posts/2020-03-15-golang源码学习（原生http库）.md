@@ -1,3 +1,15 @@
+---
+layout:     post
+title:      Golang源码学习
+subtitle:   原生http库
+date:       2020-03-15
+author:     iamwzt
+header-img: img/post-web.jpg
+catalog: true
+tags:
+    - golang
+    - http
+---
 
 ## 一个简单的 web 服务 demo
 首先是一个基于 go 的标准库 net/http 的 web 服务的 demo：
